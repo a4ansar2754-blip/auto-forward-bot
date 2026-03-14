@@ -11,7 +11,6 @@ if not os.path.exists(SESSION_DIR):
 
 clients = {}
 
-
 async def login_user(user, phone, code=None):
 
     session = f"{SESSION_DIR}/{user}"
