@@ -105,7 +105,7 @@ async def login_flow(update, context):
 
     state = login_state[user]
 
-    # STEP 1 PHONE
+    # STEP 1 : PHONE NUMBER
     if state == "PHONE":
 
         phone_data[user] = text
@@ -124,7 +124,13 @@ async def login_flow(update, context):
                 "📲 OTP Sent\n\nSend OTP now"
             )
 
-    # STEP 2 OTP
+        else:
+
+            await update.message.reply_text(
+                "❌ Failed to send OTP. Try again."
+            )
+
+    # STEP 2 : OTP
     elif state == "OTP":
 
         r = await login_user(user, code=text)
@@ -132,7 +138,7 @@ async def login_flow(update, context):
         if r == "SUCCESS":
 
             login_state.pop(user, None)
-phone_data.pop(user, None)
+            phone_data.pop(user, None)
 
             await update.message.reply_text(
                 "✅ LOGIN SUCCESS\n\nSession saved.\nYou will not need to login again."
@@ -144,6 +150,7 @@ phone_data.pop(user, None)
                 "❌ OTP Wrong. Try again."
             )
 
+        
 
 
 # ---------------- BUTTON HANDLER ---------------- #
