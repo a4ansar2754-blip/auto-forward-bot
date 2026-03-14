@@ -14,7 +14,9 @@ mode = None
 
 
 def load_config():
+
     if not os.path.exists(CONFIG_FILE):
+
         with open(CONFIG_FILE, "w") as f:
             json.dump({"sources": {}, "targets": {}}, f)
 
@@ -23,6 +25,7 @@ def load_config():
 
 
 def save_config(data):
+
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
@@ -36,8 +39,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "🚀 Auto Forward Panel\n\nSelect option below 👇",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "🚀 **Auto Forward Panel**\n\nSelect option below 👇",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
     )
 
 
@@ -53,12 +57,13 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "source"
 
         keyboard = [
-            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_chats")]
+            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
         ]
 
         await query.message.reply_text(
-            "📥 Add Source Channels\n\nClick button below 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "📥 **Add Source Channels**\n\nClick button below 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
         )
 
     elif query.data == "targets":
@@ -66,21 +71,22 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "target"
 
         keyboard = [
-            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_chats")]
+            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
         ]
 
         await query.message.reply_text(
-            "🎯 Add Target Channels\n\nClick button below 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "🎯 **Add Target Channels**\n\nClick button below 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
         )
 
     elif query.data == "dashboard":
 
         data = load_config()
 
-        text = "📊 Forwarding Dashboard\n\n"
+        text = "📊 **Forwarding Dashboard**\n\n"
 
-        text += "📥 Sources\n"
+        text += "📥 **Sources**\n"
 
         if data["sources"]:
             for name in data["sources"].values():
@@ -88,7 +94,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text += "None\n"
 
-        text += "\n🎯 Targets\n"
+        text += "\n🎯 **Targets**\n"
 
         if data["targets"]:
             for name in data["targets"].values():
@@ -96,10 +102,10 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text += "None\n"
 
-        await query.message.reply_text(text)
+        await query.message.reply_text(text, parse_mode="Markdown")
 
 
-async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global chat_list
 
@@ -110,12 +116,14 @@ async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_list = dialogs[:15]
 
-    text = "📋 Select Chat Number\n\n"
+    text = "📋 **Select Chat Number**\n\n"
 
     for i, chat in enumerate(chat_list, start=1):
+
         text += f"{i}. {chat.name}\n"
 
     buttons = []
+
     row = []
 
     for i in range(1, len(chat_list) + 1):
@@ -123,15 +131,19 @@ async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
         if len(row) == 5:
+
             buttons.append(row)
+
             row = []
 
     if row:
+
         buttons.append(row)
 
     await query.message.reply_text(
         text,
-        reply_markup=InlineKeyboardMarkup(buttons)
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown"
     )
 
 
@@ -147,6 +159,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = chat_list[index]
 
     chat_id = str(chat.id)
+
     chat_name = chat.name
 
     data = load_config()
@@ -156,7 +169,8 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["sources"][chat_id] = chat_name
 
         await query.message.reply_text(
-            f"✅ Source Added\n📥 {chat_name}"
+            f"✅ **Source Added**\n📥 {chat_name}",
+            parse_mode="Markdown"
         )
 
     elif mode == "target":
@@ -164,13 +178,15 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["targets"][chat_id] = chat_name
 
         await query.message.reply_text(
-            f"✅ Target Added\n🎯 {chat_name}"
+            f"✅ **Target Added**\n🎯 {chat_name}",
+            parse_mode="Markdown"
         )
 
     save_config(data)
 
 
 async def on_startup(app):
+
     asyncio.create_task(start_userbot())
 
 
@@ -181,10 +197,12 @@ def main():
     app.add_handler(CommandHandler("start", start))
 
     app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
-    app.add_handler(CallbackQueryHandler(fetch_chats, pattern="fetch_chats"))
+
+    app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
+
     app.add_handler(CallbackQueryHandler(add_chat, pattern="add_"))
 
-    print("BOT STARTED")
+    print("🚀 BOT STARTED")
 
     app.run_polling()
 
