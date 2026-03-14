@@ -1,5 +1,4 @@
 import asyncio
-from userbot import start_userbot
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
@@ -46,13 +45,6 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(panel))
 
 
-async def main():
+print("BOT RUNNING")
 
-    print("BOT RUNNING")
-
-    asyncio.create_task(start_userbot())
-
-    await app.run_polling()
-
-
-asyncio.run(main())
+app.run_polling()
