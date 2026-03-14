@@ -1,5 +1,4 @@
 import os
-import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -14,14 +13,16 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
-        [InlineKeyboardButton("📥 Add Sources", callback_data="add_source")],
-        [InlineKeyboardButton("🎯 Add Targets", callback_data="add_target")],
+        [InlineKeyboardButton("📥 Add Source", callback_data="add_source")],
+        [InlineKeyboardButton("🎯 Add Target", callback_data="add_target")],
+        [InlineKeyboardButton("🗑 Remove Source", callback_data="remove_source")],
+        [InlineKeyboardButton("❌ Remove Target", callback_data="remove_target")],
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")],
         [InlineKeyboardButton("⚙ Settings", callback_data="settings")]
     ]
 
     await update.message.reply_text(
-        "🚀 AUTO FORWARD PANEL\nChoose option 👇",
+        "🚀 AUTO FORWARD PRO PANEL\nChoose option 👇",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -37,17 +38,17 @@ async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     targets = data["targets"]
     s = data["settings"]
 
-    src_text = "\n".join([f"• {v}" for v in sources.values()]) or "None"
-    tgt_text = "\n".join([f"• {v}" for v in targets.values()]) or "None"
+    src = "\n".join([f"• {v}" for v in sources.values()]) or "None"
+    tgt = "\n".join([f"• {v}" for v in targets.values()]) or "None"
 
     text = f"""
 📊 BOT DASHBOARD
 
 📥 SOURCES
-{src_text}
+{src}
 
 🎯 TARGETS
-{tgt_text}
+{tgt}
 
 ⚙ SETTINGS
 
@@ -61,89 +62,7 @@ Blacklist Words : {len(s["blacklist"])}
 Replace Link : {s["replace_link"] or "None"}
 """
 
-    await update.message.reply_text(text)
-
-
-# ---------------- SOURCE LIST ---------------- #
-
-async def sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user.id
-    data = get_config(user)
-
-    text = "📥 SOURCE CHANNELS\n\n"
-
-    for i, v in enumerate(data["sources"].values(), 1):
-        text += f"{i}. {v}\n"
-
-    await update.message.reply_text(text)
-
-
-# ---------------- TARGET LIST ---------------- #
-
-async def targets(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user.id
-    data = get_config(user)
-
-    text = "🎯 TARGET CHANNELS\n\n"
-
-    for i, v in enumerate(data["targets"].values(), 1):
-        text += f"{i}. {v}\n"
-
-    await update.message.reply_text(text)
-
-
-# ---------------- REMOVE SOURCE ---------------- #
-
-async def remove_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user.id
-    data = get_config(user)
-
-    if not context.args:
-        await update.message.reply_text("Usage:\n/remove_source 1")
-        return
-
-    index = int(context.args[0]) - 1
-
-    keys = list(data["sources"].keys())
-
-    if index >= len(keys):
-        await update.message.reply_text("Invalid source number")
-        return
-
-    removed = data["sources"].pop(keys[index])
-
-    save_config(user, data)
-
-    await update.message.reply_text(f"❌ Source removed\n{removed}")
-
-
-# ---------------- REMOVE TARGET ---------------- #
-
-async def remove_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user = update.effective_user.id
-    data = get_config(user)
-
-    if not context.args:
-        await update.message.reply_text("Usage:\n/remove_target 1")
-        return
-
-    index = int(context.args[0]) - 1
-
-    keys = list(data["targets"].keys())
-
-    if index >= len(keys):
-        await update.message.reply_text("Invalid target number")
-        return
-
-    removed = data["targets"].pop(keys[index])
-
-    save_config(user, data)
-
-    await update.message.reply_text(f"❌ Target removed\n{removed}")
+    await update.callback_query.message.reply_text(text)
 
 
 # ---------------- SETTINGS ---------------- #
@@ -152,7 +71,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user.id
     data = get_config(user)
-
     s = data["settings"]
 
     text = f"""
@@ -165,7 +83,73 @@ Remove Username : {"🟢 ON" if s["remove_username"] else "🔴 OFF"}
 Auto Delete : {"🟢 ON" if s["auto_delete"] else "🔴 OFF"}
 """
 
-    await update.message.reply_text(text)
+    await update.callback_query.message.reply_text(text)
+
+
+# ---------------- REMOVE SOURCE ---------------- #
+
+async def remove_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user.id
+    data = get_config(user)
+
+    text = "🗑 SOURCE LIST\n\n"
+
+    for i, v in enumerate(data["sources"].values(), 1):
+        text += f"{i}. {v}\n"
+
+    text += "\nUse command:\n/remove_source number"
+
+    await update.callback_query.message.reply_text(text)
+
+
+# ---------------- REMOVE TARGET ---------------- #
+
+async def remove_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    user = update.effective_user.id
+    data = get_config(user)
+
+    text = "❌ TARGET LIST\n\n"
+
+    for i, v in enumerate(data["targets"].values(), 1):
+        text += f"{i}. {v}\n"
+
+    text += "\nUse command:\n/remove_target number"
+
+    await update.callback_query.message.reply_text(text)
+
+
+# ---------------- PANEL HANDLER ---------------- #
+
+async def panel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data == "dashboard":
+        await dashboard(update, context)
+
+    elif data == "settings":
+        await settings(update, context)
+
+    elif data == "remove_source":
+        await remove_source(update, context)
+
+    elif data == "remove_target":
+        await remove_target(update, context)
+
+    elif data == "add_source":
+        await query.message.reply_text(
+            "📥 Send channel ID to add source\nExample:\n-100123456789"
+        )
+
+    elif data == "add_target":
+        await query.message.reply_text(
+            "🎯 Send channel ID to add target\nExample:\n-100123456789"
+        )
 
 
 # ---------------- ADMIN PANEL ---------------- #
@@ -191,13 +175,9 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("dashboard", dashboard))
-    app.add_handler(CommandHandler("sources", sources))
-    app.add_handler(CommandHandler("targets", targets))
-    app.add_handler(CommandHandler("remove_source", remove_source))
-    app.add_handler(CommandHandler("remove_target", remove_target))
-    app.add_handler(CommandHandler("settings", settings))
     app.add_handler(CommandHandler("users", users))
+
+    app.add_handler(CallbackQueryHandler(panel_handler))
 
     print("BOT STARTED")
 
