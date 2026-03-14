@@ -17,38 +17,42 @@ client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 msg_map = {}
 album_cache = {}
 
+
 def load():
     with open(CONFIG_FILE) as f:
         return json.load(f)
 
 
-# TEXT MODIFIER
-def modify_text(text, s):
+# =========================
+# TEXT PROCESS SYSTEM
+# =========================
+
+def process_text(text, s):
 
     if not text:
         return ""
 
-    # blacklist
-    for w in s["blacklist"]:
+    # blacklist words
+    for w in s.get("blacklist", []):
         if w.lower() in text.lower():
             return None
 
-    # username remove
-    if s["remove_username"]:
+    # remove username
+    if s.get("remove_username"):
         text = re.sub(r"@\w+", "", text)
 
-    # link replace
-    if s["replace_link"]:
+    # replace words
+    replace_words = s.get("replace_words", {})
+    for old, new in replace_words.items():
+        text = text.replace(old, new)
+
+    # replace links
+    if s.get("replace_link"):
         text = re.sub(r"https?://\S+", s["replace_link"], text)
 
     # remove links
-    elif s["remove_links"]:
+    elif s.get("remove_links"):
         text = re.sub(r"https?://\S+", "", text)
-
-    # word replace
-    if "replace_words" in s:
-        for a,b in s["replace_words"].items():
-            text = text.replace(a,b)
 
     # header
     if s.get("header"):
@@ -61,16 +65,29 @@ def modify_text(text, s):
     return text
 
 
-async def start_userbot():
+# =========================
+# AUTO DELETE
+# =========================
 
-    await client.start()
+async def auto_delete(chat_id, msg_id):
 
-    print("USERBOT STARTED")
+    data = load()
+    delay = data["settings"].get("delete_timer", 0)
+
+    if delay <= 0:
+        return
+
+    await asyncio.sleep(delay)
+
+    try:
+        await client.delete_messages(int(chat_id), msg_id)
+    except:
+        pass
 
 
-# ===============================
-# MESSAGE FORWARD
-# ===============================
+# =========================
+# NEW MESSAGE FORWARD
+# =========================
 
 @client.on(events.NewMessage)
 async def forward_handler(e):
@@ -81,7 +98,7 @@ async def forward_handler(e):
     targets = data["targets"]
     s = data["settings"]
 
-    if not s["forward"]:
+    if not s.get("forward"):
         return
 
     cid = str(e.chat_id)
@@ -89,7 +106,7 @@ async def forward_handler(e):
     if cid not in sources:
         return
 
-    text = modify_text(e.message.text or "", s)
+    text = process_text(e.message.text or "", s)
 
     if text is None:
         return
@@ -100,6 +117,7 @@ async def forward_handler(e):
 
             reply_id = None
 
+            # reply sync
             if e.is_reply:
 
                 r = await e.get_reply_message()
@@ -108,6 +126,7 @@ async def forward_handler(e):
 
                     reply_id = msg_map[r.id].get(t)
 
+            # album forward
             if e.grouped_id:
 
                 album_cache.setdefault(e.grouped_id, []).append(e)
@@ -125,7 +144,8 @@ async def forward_handler(e):
                     reply_to=reply_id
                 )
 
-            elif e.media and s["media"]:
+            # media forward
+            elif e.media and s.get("media"):
 
                 sent = await client.send_file(
                     int(t),
@@ -143,46 +163,23 @@ async def forward_handler(e):
                     link_preview=False
                 )
 
-            msg_map.setdefault(e.id,{})[t] = sent.id
+            msg_map.setdefault(e.id, {})[t] = sent.id
 
-            # auto delete
-            if s["auto_delete"]:
-                asyncio.create_task(delete_later(t,sent.id))
+            if s.get("auto_delete"):
+                asyncio.create_task(auto_delete(t, sent.id))
 
         except Exception as er:
             print(er)
 
 
-# ===============================
-# DELETE TIMER
-# ===============================
-
-async def delete_later(chat,msg):
-
-    data = load()
-
-    delay = data["settings"].get("delete_timer",0)
-
-    if delay <= 0:
-        return
-
-    await asyncio.sleep(delay)
-
-    try:
-        await client.delete_messages(int(chat),msg)
-    except:
-        pass
-
-
-# ===============================
+# =========================
 # EDIT SYNC
-# ===============================
+# =========================
 
 @client.on(events.MessageEdited)
 async def edit_handler(e):
 
     data = load()
-
     targets = data["targets"]
 
     if e.id not in msg_map:
@@ -197,26 +194,20 @@ async def edit_handler(e):
             mid = msg_map[e.id].get(t)
 
             if mid:
-
-                await client.edit_message(
-                    int(t),
-                    mid,
-                    text
-                )
+                await client.edit_message(int(t), mid, text)
 
         except:
             pass
 
 
-# ===============================
+# =========================
 # DELETE SYNC
-# ===============================
+# =========================
 
 @client.on(events.MessageDeleted)
 async def delete_handler(e):
 
     data = load()
-
     targets = data["targets"]
 
     for mid in e.deleted_ids:
@@ -231,11 +222,20 @@ async def delete_handler(e):
                 tid = msg_map[mid].get(t)
 
                 if tid:
-                    await client.delete_messages(int(t),tid)
+                    await client.delete_messages(int(t), tid)
 
             except:
                 pass
 
 
-async def run():
+# =========================
+# START USERBOT
+# =========================
+
+async def start_userbot():
+
+    await client.start()
+
+    print("USERBOT RUNNING")
+
     await client.run_until_disconnected()
