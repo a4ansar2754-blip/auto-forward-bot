@@ -7,7 +7,11 @@
   "remove_links": false,
   "remove_username": false,
   "auto_delete": false,
+  "replace_link": "",
+  "replace_words": {},
   "blacklist": [],
-  "replace_link": ""
+  "header": "",
+  "footer": "",
+  "delete_timer": 0
  }
 }
