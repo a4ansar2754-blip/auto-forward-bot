@@ -29,24 +29,23 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 
-# ================= START PANEL =================
+# ================= START =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
-        [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")],
+        [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
     ]
 
     await update.message.reply_text(
-        "🚀 **Auto Forward Control Panel**\n\n"
-        "Choose an option below 👇",
+        "🚀 **Auto Forward Panel**\n\nSelect option below 👇",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
-# ================= MAIN PANEL =================
+# ================= PANEL =================
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -65,9 +64,8 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(
             "📥 **Add Source Channels**\n\n"
-            "1️⃣ Go to Telegram chats\n"
-            "2️⃣ Pin the channels you want\n"
-            "3️⃣ Then click button below 👇",
+            "1️⃣ Pin the channels\n"
+            "2️⃣ Click button below 👇",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -81,8 +79,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(
             "🎯 **Add Target Channels**\n\n"
-            "Pin target channels first\n"
-            "Then click the button 👇",
+            "Pin target channels then press button 👇",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -90,11 +87,33 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data = load_config()
 
-        await query.message.reply_text(
-            "📊 **Forwarding Dashboard**\n\n"
-            f"📥 Sources : {len(data['sources'])}\n"
-            f"🎯 Targets : {len(data['targets'])}"
-        )
+        text = "📊 **Forwarding Dashboard**\n\n"
+
+        text += "📥 **Sources**\n"
+
+        if data["sources"]:
+            for s in data["sources"]:
+                try:
+                    chat = await client.get_entity(int(s))
+                    text += f"• {chat.title}\n"
+                except:
+                    text += "• Unknown channel\n"
+        else:
+            text += "None\n"
+
+        text += "\n🎯 **Targets**\n"
+
+        if data["targets"]:
+            for t in data["targets"]:
+                try:
+                    chat = await client.get_entity(int(t))
+                    text += f"• {chat.title}\n"
+                except:
+                    text += "• Unknown channel\n"
+        else:
+            text += "None\n"
+
+        await query.message.reply_text(text)
 
 
 # ================= FETCH PINNED =================
@@ -125,9 +144,7 @@ async def fetch_pinned(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i in range(1, min(len(pinned_chats), 15) + 1):
 
         row.append(
-            InlineKeyboardButton(
-                f"{i}️⃣", callback_data=f"add_{i}"
-            )
+            InlineKeyboardButton(f"{i}️⃣", callback_data=f"add_{i}")
         )
 
         if len(row) == 5:
@@ -166,9 +183,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data["sources"].append(chat_id)
             save_config(data)
 
-            await query.message.reply_text(
-                f"✅ **Source Added**\n📥 {chat.name}"
-            )
+            await query.message.reply_text(f"✅ **Source Added**\n📥 {chat.name}")
 
         else:
             await query.message.reply_text("⚠️ Source already added")
@@ -179,9 +194,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             data["targets"].append(chat_id)
             save_config(data)
 
-            await query.message.reply_text(
-                f"✅ **Target Added**\n🎯 {chat.name}"
-            )
+            await query.message.reply_text(f"✅ **Target Added**\n🎯 {chat.name}")
 
         else:
             await query.message.reply_text("⚠️ Target already added")
@@ -190,6 +203,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================= START USERBOT =================
 
 async def on_startup(app):
+
     asyncio.create_task(start_userbot())
 
 
