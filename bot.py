@@ -19,7 +19,6 @@ mode = None
 def load_config():
 
     if not os.path.exists(CONFIG_FILE):
-
         with open(CONFIG_FILE, "w") as f:
             json.dump({"sources": {}, "targets": {}}, f)
 
@@ -36,21 +35,14 @@ def save_config(data):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
-
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
-
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
-
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
-
     ]
 
     await update.message.reply_text(
-
         "🚀 Auto Forward Panel\n\nSelect option below 👇",
-
         reply_markup=InlineKeyboardMarkup(keyboard)
-
     )
 
 
@@ -59,7 +51,6 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
     query = update.callback_query
-
     await query.answer()
 
     if query.data == "sources":
@@ -67,17 +58,12 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "source"
 
         keyboard = [
-
             [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
-
         ]
 
         await query.message.reply_text(
-
             "📥 Add Source Channels\n\nClick button below 👇",
-
             reply_markup=InlineKeyboardMarkup(keyboard)
-
         )
 
     elif query.data == "targets":
@@ -85,17 +71,12 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "target"
 
         keyboard = [
-
             [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
-
         ]
 
         await query.message.reply_text(
-
             "🎯 Add Target Channels\n\nClick button below 👇",
-
             reply_markup=InlineKeyboardMarkup(keyboard)
-
         )
 
     elif query.data == "dashboard":
@@ -107,25 +88,17 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "📥 Sources\n"
 
         if data["sources"]:
-
             for name in data["sources"].values():
-
                 text += f"• {name}\n"
-
         else:
-
             text += "None\n"
 
         text += "\n🎯 Targets\n"
 
         if data["targets"]:
-
             for name in data["targets"].values():
-
                 text += f"• {name}\n"
-
         else:
-
             text += "None\n"
 
         await query.message.reply_text(text)
@@ -136,7 +109,6 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global chat_list
 
     query = update.callback_query
-
     await query.answer()
 
     dialogs = await client.get_dialogs()
@@ -146,37 +118,27 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📋 Select Chat Number\n\n"
 
     for i, chat in enumerate(chat_list, start=1):
-
         text += f"{i}. {chat.name}\n"
 
     buttons = []
-
     row = []
 
     for i in range(1, len(chat_list) + 1):
 
         row.append(
-
             InlineKeyboardButton(str(i), callback_data=f"add_{i}")
-
         )
 
         if len(row) == 5:
-
             buttons.append(row)
-
             row = []
 
     if row:
-
         buttons.append(row)
 
     await query.message.reply_text(
-
         text,
-
         reply_markup=InlineKeyboardMarkup(buttons)
-
     )
 
 
@@ -185,15 +147,16 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
     query = update.callback_query
-
     await query.answer()
 
     index = int(query.data.split("_")[1]) - 1
 
+    if index >= len(chat_list):
+        return
+
     chat = chat_list[index]
 
     chat_id = str(chat.id)
-
     chat_name = chat.name
 
     data = load_config()
@@ -203,9 +166,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["sources"][chat_id] = chat_name
 
         await query.message.reply_text(
-
             f"✅ Source Added\n📥 {chat_name}"
-
         )
 
     elif mode == "target":
@@ -213,9 +174,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["targets"][chat_id] = chat_name
 
         await query.message.reply_text(
-
             f"✅ Target Added\n🎯 {chat_name}"
-
         )
 
     save_config(data)
@@ -236,7 +195,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
 
-    app.add_handler(CallbackQueryHandler(add_chat, pattern="add_"))
+    app.add_handler(CallbackQueryHandler(add_chat, pattern=r"^add_"))
 
     print("BOT STARTED")
 
