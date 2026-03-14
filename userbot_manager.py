@@ -6,9 +6,14 @@ API_HASH = os.getenv("API_HASH")
 
 clients = {}
 
+SESSION_DIR = "sessions"
+
+if not os.path.isdir(SESSION_DIR):
+    os.mkdir(SESSION_DIR)
+
 async def login_user(user, phone, code=None):
 
-    session_file = f"sessions/{user}"
+    session_file = f"{SESSION_DIR}/{user}"
 
     client = TelegramClient(session_file, API_ID, API_HASH)
 
