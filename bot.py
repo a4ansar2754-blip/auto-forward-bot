@@ -1,12 +1,10 @@
-import asyncio
 import os
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from userbot import start_userbot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,10 +40,6 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("📊 Dashboard coming soon")
 
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(panel))
-
-
 async def main():
 
     print("BOT RUNNING")
@@ -53,8 +47,16 @@ async def main():
     # start telegram account
     asyncio.create_task(start_userbot())
 
-    # start bot
-    await app.run_polling()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(panel))
+
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    await asyncio.Event().wait()
 
 
-asyncio.run(main())
+asyncio.get_event_loop().run_until_complete(main())
