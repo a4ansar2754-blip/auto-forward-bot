@@ -8,8 +8,8 @@ clients = {}
 
 SESSION_DIR = "sessions"
 
-if not os.path.isdir(SESSION_DIR):
-    os.mkdir(SESSION_DIR)
+if not os.path.exists(SESSION_DIR):
+    os.makedirs(SESSION_DIR)
 
 async def login_user(user, phone, code=None):
 
@@ -22,12 +22,10 @@ async def login_user(user, phone, code=None):
     if not await client.is_user_authorized():
 
         if code is None:
-
             await client.send_code_request(phone)
             return "CODE"
 
         else:
-
             await client.sign_in(phone, code)
 
     clients[user] = client
