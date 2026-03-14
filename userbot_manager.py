@@ -1,54 +1,40 @@
-import os
 from telethon import TelegramClient
+import os
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 
-SESSION_DIR = "sessions"
-
-if not os.path.exists(SESSION_DIR):
-    os.makedirs(SESSION_DIR)
-
 clients = {}
-login_data = {}
+phone_hash = {}
 
-async def login_user(user, phone=None, code=None):
 
-    session = f"{SESSION_DIR}/{user}"
+async def login_user(user_id, phone=None, code=None):
 
-    client = TelegramClient(session, API_ID, API_HASH)
+    session_file = f"sessions/{user_id}"
+
+    client = TelegramClient(session_file, API_ID, API_HASH)
 
     await client.connect()
 
-    # STEP 1 SEND CODE
-    if code is None:
+    # STEP 1 SEND OTP
+    if phone:
 
-        result = await client.send_code_request(phone)
+        r = await client.send_code_request(phone)
 
-        login_data[user] = {
-            "phone": phone,
-            "phone_code_hash": result.phone_code_hash,
-            "client": client
-        }
+        phone_hash[user_id] = r.phone_code_hash
+
+        clients[user_id] = client
 
         return "CODE"
 
     # STEP 2 VERIFY OTP
-    data = login_data.get(user)
+    if code:
 
-    if not data:
-        return "ERROR"
+        client = clients[user_id]
 
-    client = data["client"]
+        await client.sign_in(
+            code=code,
+            phone_code_hash=phone_hash[user_id]
+        )
 
-    await client.sign_in(
-        phone=data["phone"],
-        code=code,
-        phone_code_hash=data["phone_code_hash"]
-    )
-
-    clients[user] = client
-
-    login_data.pop(user)
-
-    return "SUCCESS"
+        return "SUCCESS"
