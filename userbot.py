@@ -28,6 +28,8 @@ async def start_userbot():
 
     print("USERBOT RUNNING")
 
+    # NORMAL MESSAGE
+
     @client.on(events.NewMessage)
 
     async def forward_handler(event):
@@ -94,5 +96,86 @@ async def start_userbot():
 
             except Exception as e:
                 print("Forward error:", e)
+
+
+    # ALBUM FORWARD
+
+    @client.on(events.Album)
+
+    async def album_forward(event):
+
+        data = load()
+
+        sources = data["sources"]
+        targets = data["targets"]
+
+        cid = str(event.chat_id)
+
+        if cid not in sources:
+            return
+
+        media = [msg.media for msg in event.messages]
+
+        caption = event.messages[0].text or ""
+
+        for target in targets:
+
+            try:
+
+                await client.send_file(
+                    int(target),
+                    media,
+                    caption=caption
+                )
+
+            except Exception as e:
+                print("Album error:", e)
+
+
+    # DELETE SYNC
+
+    @client.on(events.MessageDeleted)
+
+    async def delete_sync(event):
+
+        data = load()
+        targets = data["targets"]
+
+        for msg_id in event.deleted_ids:
+
+            if msg_id in msg_map:
+
+                for target, target_msg in msg_map[msg_id].items():
+
+                    try:
+                        await client.delete_messages(int(target), target_msg)
+                    except:
+                        pass
+
+
+    # EDIT SYNC
+
+    @client.on(events.MessageEdited)
+
+    async def edit_sync(event):
+
+        msg_id = event.message.id
+
+        if msg_id not in msg_map:
+            return
+
+        for target, target_msg in msg_map[msg_id].items():
+
+            try:
+
+                await client.edit_message(
+                    int(target),
+                    target_msg,
+                    event.message.text
+                )
+
+            except:
+                pass
+
 
     await client.run_until_disconnected()
