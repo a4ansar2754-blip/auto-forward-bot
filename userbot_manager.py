@@ -1,15 +1,18 @@
 import os
 from telethon import TelegramClient
-from telethon.sessions import StringSession
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 
 clients = {}
 
+# ensure sessions folder exists
+os.makedirs("sessions", exist_ok=True)
+
+
 async def login_user(user_id, phone, code=None, password=None):
 
-    session_file = f"sessions/{user_id}.session"
+    session_file = f"sessions/{user_id}"
 
     client = TelegramClient(session_file, API_ID, API_HASH)
 
