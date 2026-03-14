@@ -41,7 +41,6 @@ async def main():
 
 print("BOT RUNNING")
 
-# start userbot
 asyncio.create_task(start_userbot())
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
