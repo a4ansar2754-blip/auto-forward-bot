@@ -4,18 +4,19 @@ from telethon import TelegramClient
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 
+SESSION_DIR = "sessions"
+
+if not os.path.exists(SESSION_DIR):
+    os.makedirs(SESSION_DIR)
+
 clients = {}
 
-SESSION_DIR = "sessions"
 
 async def login_user(user, phone, code=None):
 
-    if not os.path.isdir(SESSION_DIR):
-        os.mkdir(SESSION_DIR)
+    session = f"{SESSION_DIR}/{user}"
 
-    session_file = f"{SESSION_DIR}/{user}"
-
-    client = TelegramClient(session_file, API_ID, API_HASH)
+    client = TelegramClient(session, API_ID, API_HASH)
 
     await client.connect()
 
