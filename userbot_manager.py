@@ -6,10 +6,9 @@ API_HASH = os.getenv("API_HASH")
 
 clients = {}
 
-SESSION_DIR = "sessions"
+SESSION_DIR = "./sessions"
 
-if not os.path.exists(SESSION_DIR):
-    os.makedirs(SESSION_DIR)
+os.makedirs(SESSION_DIR, exist_ok=True)
 
 async def login_user(user, phone, code=None):
 
