@@ -40,7 +40,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# BUTTON PANEL
+# PANEL BUTTONS
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
@@ -85,9 +85,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
-        await update.message.reply_text(
-            "Usage:\n/addsource -100123456789"
-        )
+        await update.message.reply_text("Usage:\n/addsource -100123456789")
         return
 
     source = context.args[0]
@@ -98,18 +96,14 @@ async def add_source(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["sources"].append(source)
         save_config(data)
 
-    await update.message.reply_text(
-        f"✅ Source Added\n{source}"
-    )
+    await update.message.reply_text(f"✅ Source Added\n{source}")
 
 
 # ADD TARGET
 async def add_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
-        await update.message.reply_text(
-            "Usage:\n/addtarget -100123456789"
-        )
+        await update.message.reply_text("Usage:\n/addtarget -100123456789")
         return
 
     target = context.args[0]
@@ -120,8 +114,76 @@ async def add_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["targets"].append(target)
         save_config(data)
 
+    await update.message.reply_text(f"✅ Target Added\n{target}")
+
+
+# TARGET UI (Best Auto Forward Style)
+async def target_ui(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = [
+        [InlineKeyboardButton("✅ I have pinned the chats", callback_data="pinned")]
+    ]
+
+    text = (
+        "Follow These Steps to Set Target Channels\n\n"
+        "1. Go to the Chats From Which You Want to Copy Messages.\n"
+        "2. Press and Hold the Source Channel.\n"
+        "3. Tap on the Pin Icon to Pin it At the Top.\n\n"
+        "⚠ Note: Make Sure You Have Admin or Send Message Permission In Target Channel/Group."
+    )
+
     await update.message.reply_text(
-        f"✅ Target Added\n{target}"
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+# PINNED BUTTON HANDLER
+async def pinned_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    chats = [
+        "Channel One",
+        "Channel Two",
+        "Channel Three",
+        "Channel Four",
+        "Channel Five",
+        "Channel Six",
+        "Channel Seven",
+        "Channel Eight",
+        "Channel Nine",
+        "Channel Ten",
+        "Channel Eleven",
+        "Channel Twelve",
+        "Channel Thirteen",
+        "Channel Fourteen",
+        "Channel Fifteen"
+    ]
+
+    text = "🎯 Select the Number Below to Set Your Target\n\n"
+
+    for i, c in enumerate(chats, 1):
+        text += f"{i}. {c}\n"
+
+    keyboard = []
+    row = []
+
+    for i in range(1, len(chats)+1):
+
+        row.append(InlineKeyboardButton(str(i), callback_data=f"settarget_{i}"))
+
+        if len(row) == 5:
+            keyboard.append(row)
+            row = []
+
+    if row:
+        keyboard.append(row)
+
+    await query.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
@@ -142,8 +204,10 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("addsource", add_source))
     app.add_handler(CommandHandler("addtarget", add_target))
+    app.add_handler(CommandHandler("target", target_ui))
 
     app.add_handler(CallbackQueryHandler(panel))
+    app.add_handler(CallbackQueryHandler(pinned_handler, pattern="pinned"))
 
     print("BOT STARTED")
 
