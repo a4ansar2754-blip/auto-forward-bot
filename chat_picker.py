@@ -3,13 +3,9 @@ from userbot_manager import clients
 
 chat_cache = {}
 
-
 async def get_user_chats(user):
 
     client = clients.get(user)
-
-    if not client:
-        return []
 
     chats = []
 
@@ -24,7 +20,6 @@ async def get_user_chats(user):
     chat_cache[user] = chats
 
     return chats
-
 
 def get_chat(user, index):
 
