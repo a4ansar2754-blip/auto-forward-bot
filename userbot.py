@@ -1,7 +1,6 @@
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
 import os
 import json
+from telethon import TelegramClient, events
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -9,46 +8,62 @@ STRING_SESSION = os.getenv("STRING_SESSION")
 
 CONFIG_FILE = "config.json"
 
-client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
+client = TelegramClient("userbot", API_ID, API_HASH)
 
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
-        return {"sources": [], "targets": []}
+        return {"sources": {}, "targets": {}}
 
     with open(CONFIG_FILE) as f:
         return json.load(f)
 
 
+async def copy_message(message, target):
+
+    try:
+
+        if message.text:
+            await client.send_message(
+                target,
+                message.text,
+                link_preview=False
+            )
+
+        elif message.media:
+
+            file = await message.download_media()
+
+            await client.send_file(
+                target,
+                file,
+                caption=message.text if message.text else None
+            )
+
+    except Exception as e:
+        print("Forward Error:", e)
+
+
 async def start_userbot():
 
-    await client.start()
+    await client.start(string_session=STRING_SESSION)
 
     print("USERBOT STARTED")
-
 
     @client.on(events.NewMessage)
     async def handler(event):
 
         data = load_config()
 
-        source_list = data["sources"]
-        target_list = data["targets"]
+        sources = data["sources"]
+        targets = data["targets"]
 
         chat_id = str(event.chat_id)
 
-        if chat_id in source_list:
+        if chat_id in sources:
 
-            for target in target_list:
+            for target_id in targets.keys():
 
-                try:
-                    await client.forward_messages(
-                        int(target),
-                        event.message
-                    )
-
-                except Exception as e:
-                    print("Forward Error:", e)
-
+                await copy_message(event.message, int(target_id))
 
     await client.run_until_disconnected()
