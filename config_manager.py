@@ -1,35 +1,30 @@
 import json
 import os
 
-def get_config(user_id):
+os.makedirs("configs",exist_ok=True)
 
-    path = f"configs/{user_id}.json"
+def get_config(user):
 
-    if not os.path.exists(path):
+    file=f"configs/{user}.json"
 
-        data = {
+    if not os.path.exists(file):
+
+        data={
             "sources":{},
-            "targets":{},
-            "settings":{
-                "forward":True,
-                "media":True,
-                "remove_links":False,
-                "remove_username":False,
-                "auto_delete":False,
-                "replace_link":"",
-                "replace_words":{},
-                "blacklist":[]
-            }
+            "targets":{}
         }
 
-        with open(path,"w") as f:
-            json.dump(data,f,indent=2)
+        with open(file,"w") as f:
+            json.dump(data,f)
 
-    with open(path) as f:
+        return data
+
+    with open(file) as f:
         return json.load(f)
 
+def save_config(user,data):
 
-def save_config(user_id,data):
+    file=f"configs/{user}.json"
 
-    with open(f"configs/{user_id}.json","w") as f:
-        json.dump(data,f,indent=2)
+    with open(file,"w") as f:
+        json.dump(data,f)
