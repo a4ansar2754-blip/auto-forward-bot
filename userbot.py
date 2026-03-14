@@ -1,6 +1,7 @@
 import os
 import json
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -8,7 +9,7 @@ STRING_SESSION = os.getenv("STRING_SESSION")
 
 CONFIG_FILE = "config.json"
 
-client = TelegramClient("userbot", API_ID, API_HASH)
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 
 def load_config():
@@ -46,7 +47,7 @@ async def copy_message(message, target):
 
 async def start_userbot():
 
-    await client.start(string_session=STRING_SESSION)
+    await client.start()
 
     print("USERBOT STARTED")
 
