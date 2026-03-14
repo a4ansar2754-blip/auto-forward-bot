@@ -6,10 +6,6 @@ API_HASH = os.getenv("API_HASH")
 
 clients = {}
 
-# folder create safely
-if not os.path.exists("sessions"):
-    os.mkdir("sessions")
-
 async def login_user(user, phone, code=None):
 
     session_file = f"sessions/{user}"
