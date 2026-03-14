@@ -6,13 +6,15 @@ API_HASH = os.getenv("API_HASH")
 
 clients = {}
 
-os.makedirs("sessions",exist_ok=True)
+# folder create safely
+if not os.path.exists("sessions"):
+    os.mkdir("sessions")
 
-async def login_user(user,phone,code=None):
+async def login_user(user, phone, code=None):
 
-    session=f"sessions/{user}"
+    session_file = f"sessions/{user}"
 
-    client=TelegramClient(session,API_ID,API_HASH)
+    client = TelegramClient(session_file, API_ID, API_HASH)
 
     await client.connect()
 
@@ -25,8 +27,8 @@ async def login_user(user,phone,code=None):
 
         else:
 
-            await client.sign_in(phone,code)
+            await client.sign_in(phone, code)
 
-    clients[user]=client
+    clients[user] = client
 
     return "SUCCESS"
