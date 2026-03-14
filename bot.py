@@ -4,17 +4,18 @@ import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    filters,
-    ContextTypes
+ApplicationBuilder,
+CommandHandler,
+CallbackQueryHandler,
+MessageHandler,
+filters,
+ContextTypes
 )
 
 from userbot import client, start_userbot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
 CONFIG_FILE = "config.json"
 
 chat_list = []
@@ -38,7 +39,6 @@ def load_config():
                     "remove_links": False,
                     "remove_username": False,
                     "replace_link": "",
-                    "auto_delete": False,
                     "blacklist": []
                 }
             }, f)
@@ -57,7 +57,7 @@ def icon(v):
     return "🟢" if v else "🔴"
 
 
-# ---------- START PANEL ----------
+# ---------- START ----------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -116,7 +116,6 @@ Forward: {icon(s["forward"])}
 Media: {icon(s["media"])}
 Remove Links: {icon(s["remove_links"])}
 Remove Username: {icon(s["remove_username"])}
-Auto Delete: {icon(s["auto_delete"])}
 
 Blacklist: {len(s["blacklist"])} words
 Replace Link: {s["replace_link"] or "None"}
@@ -185,7 +184,8 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         data["sources"][cid] = name
-        await query.message.reply_text(f"Added source {name}")
+
+        await query.message.reply_text(f"Source added: {name}")
 
     elif mode == "target":
 
@@ -194,9 +194,30 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         data["targets"][cid] = name
-        await query.message.reply_text(f"Added target {name}")
+
+        await query.message.reply_text(f"Target added: {name}")
 
     save_config(data)
+
+
+# ---------- SETTINGS ----------
+
+async def forward_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    d = load_config()
+    d["settings"]["forward"] = True
+    save_config(d)
+
+    await update.message.reply_text("🟢 Forwarding ON")
+
+
+async def forward_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    d = load_config()
+    d["settings"]["forward"] = False
+    save_config(d)
+
+    await update.message.reply_text("🔴 Forwarding OFF")
 
 
 # ---------- BLACKLIST ----------
@@ -216,7 +237,7 @@ async def replace_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     waiting_replace = True
 
-    await update.message.reply_text("Send link to replace")
+    await update.message.reply_text("Send link")
 
 
 async def message_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -248,32 +269,17 @@ async def message_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Replace link saved")
 
 
-# ---------- USERBOT START ----------
-
 async def startup(app):
     asyncio.create_task(start_userbot())
 
-
-# ---------- MAIN ----------
 
 def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).post_init(startup).build()
 
     app.add_handler(CommandHandler("start", start))
-
     app.add_handler(CommandHandler("forward_on", forward_on))
     app.add_handler(CommandHandler("forward_off", forward_off))
-
-    app.add_handler(CommandHandler("media_on", media_on))
-    app.add_handler(CommandHandler("media_off", media_off))
-
-    app.add_handler(CommandHandler("links_on", links_on))
-    app.add_handler(CommandHandler("links_off", links_off))
-
-    app.add_handler(CommandHandler("username_on", username_on))
-    app.add_handler(CommandHandler("username_off", username_off))
-
     app.add_handler(CommandHandler("blacklist_add", blacklist_add))
     app.add_handler(CommandHandler("set_replace_link", replace_link))
 
@@ -282,8 +288,6 @@ def main():
     app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
     app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
     app.add_handler(CallbackQueryHandler(add, pattern=r"^add_\d+$"))
-
-    print("BOT STARTED")
 
     app.run_polling()
 
