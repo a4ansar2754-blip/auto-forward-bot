@@ -7,19 +7,16 @@ from telegram.ext import (
 ApplicationBuilder,
 CommandHandler,
 CallbackQueryHandler,
-MessageHandler,
-filters,
 ContextTypes
 )
 
-from userbot import client,start_userbot
+from userbot import client, start_userbot
 
-BOT_TOKEN=os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CONFIG_FILE = "config.json"
 
-CONFIG_FILE="config.json"
-
-chat_list=[]
-mode=None
+chat_list = []
+mode = None
 
 
 def load_config():
@@ -58,7 +55,7 @@ def icon(v):
     return "🟢" if v else "🔴"
 
 
-# START PANEL
+# ---------------- START PANEL ----------------
 
 async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -71,12 +68,15 @@ async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        "🚀 AUTO FORWARD PANEL",
+
+        "🚀 AUTO FORWARD PANEL\n\nChoose option 👇",
+
         reply_markup=InlineKeyboardMarkup(keyboard)
+
     )
 
 
-# PANEL
+# ---------------- PANEL ----------------
 
 async def panel(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -89,23 +89,31 @@ async def panel(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
         mode="source"
 
-        kb=[[InlineKeyboardButton("📌 I have pinned the chats",callback_data="fetch")]]
+        kb=[[InlineKeyboardButton("📌 Show Chats",callback_data="fetch")]]
 
         await query.message.reply_text(
-            "Add SOURCE channel",
+
+            "📥 Select SOURCE channel",
+
             reply_markup=InlineKeyboardMarkup(kb)
+
         )
+
 
     elif query.data=="targets":
 
         mode="target"
 
-        kb=[[InlineKeyboardButton("📌 I have pinned the chats",callback_data="fetch")]]
+        kb=[[InlineKeyboardButton("📌 Show Chats",callback_data="fetch")]]
 
         await query.message.reply_text(
-            "Add TARGET channel",
+
+            "🎯 Select TARGET channel",
+
             reply_markup=InlineKeyboardMarkup(kb)
+
         )
+
 
     elif query.data=="dashboard":
 
@@ -147,7 +155,7 @@ Replace Link : {s["replace_link"] or "None"}
         await query.message.reply_text(text)
 
 
-# FETCH CHATS
+# ---------------- FETCH CHATS ----------------
 
 async def fetch(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -160,7 +168,7 @@ async def fetch(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
     chat_list=dialogs[:15]
 
-    txt="Select chat\n\n"
+    txt="📋 SELECT CHAT\n\n"
 
     for i,c in enumerate(chat_list,1):
         txt+=f"{i}. {c.name}\n"
@@ -179,10 +187,16 @@ async def fetch(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if row:
         btn.append(row)
 
-    await query.message.reply_text(txt,reply_markup=InlineKeyboardMarkup(btn))
+    await query.message.reply_text(
+
+        txt,
+
+        reply_markup=InlineKeyboardMarkup(btn)
+
+    )
 
 
-# ADD CHAT
+# ---------------- ADD CHAT ----------------
 
 async def add(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -193,6 +207,11 @@ async def add(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
     index=int(query.data.split("_")[1])-1
 
+    if index>=len(chat_list):
+
+        await query.message.reply_text("❌ Invalid selection")
+        return
+
     chat=chat_list[index]
 
     cid=str(chat.id)
@@ -202,46 +221,49 @@ async def add(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
     if mode=="source":
 
+        if cid in data["sources"]:
+
+            await query.message.reply_text(
+                f"❌ Already added as SOURCE\n📥 {name}"
+            )
+
+            return
+
         data["sources"][cid]=name
-        await query.message.reply_text(f"Source added {name}")
+
+        await query.message.reply_text(
+            f"✅ SOURCE ADDED\n📥 {name}"
+        )
+
 
     elif mode=="target":
 
+        if cid in data["targets"]:
+
+            await query.message.reply_text(
+                f"❌ Already added as TARGET\n🎯 {name}"
+            )
+
+            return
+
         data["targets"][cid]=name
-        await query.message.reply_text(f"Target added {name}")
+
+        await query.message.reply_text(
+            f"✅ TARGET ADDED\n🎯 {name}"
+        )
+
 
     save_config(data)
 
 
-# SETTINGS COMMANDS
-
-async def forward_on(update,context):
-
-    d=load_config()
-    d["settings"]["forward"]=True
-    save_config(d)
-
-    await update.message.reply_text("🟢 Forward ON")
-
-
-async def forward_off(update,context):
-
-    d=load_config()
-    d["settings"]["forward"]=False
-    save_config(d)
-
-    await update.message.reply_text("🔴 Forward OFF")
-
-
-async def settings(update,context):
-
-    data=load_config()
-    await update.message.reply_text(json.dumps(data["settings"],indent=2))
-
+# ---------------- USERBOT START ----------------
 
 async def startup(app):
+
     asyncio.create_task(start_userbot())
 
+
+# ---------------- MAIN ----------------
 
 def main():
 
@@ -249,16 +271,23 @@ def main():
 
     app.add_handler(CommandHandler("start",start))
 
-    app.add_handler(CommandHandler("forward_on",forward_on))
-    app.add_handler(CommandHandler("forward_off",forward_off))
-    app.add_handler(CommandHandler("settings",settings))
+    app.add_handler(
+        CallbackQueryHandler(panel,pattern="^(sources|targets|dashboard)$")
+    )
 
-    app.add_handler(CallbackQueryHandler(panel,pattern="sources|targets|dashboard"))
-    app.add_handler(CallbackQueryHandler(fetch,pattern="fetch"))
-    app.add_handler(CallbackQueryHandler(add,pattern="add_"))
+    app.add_handler(
+        CallbackQueryHandler(fetch,pattern="^fetch$")
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(add,pattern=r"^add_\d+$")
+    )
+
+    print("BOT STARTED")
 
     app.run_polling()
 
 
 if __name__=="__main__":
+
     main()
