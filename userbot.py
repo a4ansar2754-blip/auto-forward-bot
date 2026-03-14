@@ -1,6 +1,8 @@
 import os
 import json
+
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -8,9 +10,9 @@ STRING_SESSION = os.getenv("STRING_SESSION")
 
 CONFIG_FILE = "config.json"
 
-client = TelegramClient("userbot", API_ID, API_HASH)
+# FIX: string session load correctly
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
-# message mapping for reply/edit/delete sync
 msg_map = {}
 
 
@@ -26,9 +28,10 @@ def load_config():
 
 async def start_userbot():
 
-    await client.start(string_session=STRING_SESSION)
+    await client.start()
 
     print("USERBOT STARTED")
+
 
     # ---------------- NORMAL MESSAGE ----------------
 
@@ -126,9 +129,6 @@ async def start_userbot():
 
     @client.on(events.MessageDeleted)
     async def delete_sync(event):
-
-        data = load_config()
-        targets = data.get("targets", {})
 
         for msg_id in event.deleted_ids:
 
