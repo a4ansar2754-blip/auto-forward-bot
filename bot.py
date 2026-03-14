@@ -27,32 +27,30 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "sources":
         await query.message.reply_text("📥 Source panel coming soon")
-
     elif query.data == "targets":
         await query.message.reply_text("🎯 Target panel coming soon")
-
     elif query.data == "settings":
         await query.message.reply_text("⚙ Settings panel coming soon")
-
     elif query.data == "dashboard":
         await query.message.reply_text("📊 Dashboard coming soon")
 
 
-async def main():
-    print("BOT RUNNING")
-
-    # start userbot
+async def on_startup(app):
+    print("USERBOT STARTING...")
     asyncio.create_task(start_userbot())
 
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+def main():
+    print("BOT RUNNING")
+
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(on_startup).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(panel))
 
     print("BOT STARTED")
-
-    await app.run_polling()
+    app.run_polling()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
