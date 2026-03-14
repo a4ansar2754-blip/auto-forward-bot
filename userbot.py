@@ -1,13 +1,15 @@
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 import os
 import json
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
+STRING_SESSION = os.getenv("STRING_SESSION")
 
 CONFIG_FILE = "config.json"
 
-client = TelegramClient("session", API_ID, API_HASH)
+client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 
 def load_config():
@@ -23,6 +25,7 @@ async def start_userbot():
     await client.start()
 
     print("USERBOT STARTED")
+
 
     @client.on(events.NewMessage)
     async def handler(event):
@@ -43,7 +46,9 @@ async def start_userbot():
                         int(target),
                         event.message
                     )
+
                 except Exception as e:
                     print("Forward Error:", e)
+
 
     await client.run_until_disconnected()
