@@ -1,8 +1,13 @@
+import asyncio
+from userbot import start_userbot
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -17,6 +22,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🚀 Welcome to Auto Forward Panel",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -35,11 +41,18 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "dashboard":
         await query.message.reply_text("📊 Dashboard coming soon")
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(panel))
 
-print("BOT RUNNING")
 
-app.run_polling()
+async def main():
+
+    print("BOT RUNNING")
+
+    asyncio.create_task(start_userbot())
+
+    await app.run_polling()
+
+
+asyncio.run(main())
