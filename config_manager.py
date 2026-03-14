@@ -1,30 +1,31 @@
 import json
 import os
 
-os.makedirs("configs",exist_ok=True)
+CONFIG_FOLDER = "configs"
 
 def get_config(user):
 
-    file=f"configs/{user}.json"
+    path = f"{CONFIG_FOLDER}/{user}.json"
 
-    if not os.path.exists(file):
+    if not os.path.exists(path):
 
-        data={
-            "sources":{},
-            "targets":{}
+        data = {
+            "sources": {},
+            "targets": {}
         }
 
-        with open(file,"w") as f:
-            json.dump(data,f)
+        with open(path, "w") as f:
+            json.dump(data, f)
 
         return data
 
-    with open(file) as f:
+    with open(path) as f:
         return json.load(f)
 
-def save_config(user,data):
 
-    file=f"configs/{user}.json"
+def save_config(user, data):
 
-    with open(file,"w") as f:
-        json.dump(data,f)
+    path = f"{CONFIG_FOLDER}/{user}.json"
+
+    with open(path, "w") as f:
+        json.dump(data, f)
