@@ -9,7 +9,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 CONFIG_FILE = "config.json"
 
-pinned_cache = []
+pinned_chats = []
+mode = None
 
 
 def load_config():
@@ -43,13 +44,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    global mode
+
     query = update.callback_query
     await query.answer()
 
     if query.data == "sources":
 
+        mode = "source"
+
         keyboard = [
-            [InlineKeyboardButton("✅ I have pinned the chats", callback_data="fetch_sources")]
+            [InlineKeyboardButton("✅ I have pinned the chats", callback_data="fetch_pins")]
         ]
 
         await query.message.reply_text(
@@ -62,12 +67,15 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "targets":
 
+        mode = "target"
+
         keyboard = [
-            [InlineKeyboardButton("✅ I have pinned the chats", callback_data="fetch_targets")]
+            [InlineKeyboardButton("✅ I have pinned the chats", callback_data="fetch_pins")]
         ]
 
         await query.message.reply_text(
-            "📌 Pin the chats you want as TARGET",
+            "📌 Pin the chats you want as TARGET\n\n"
+            "Then click the button below",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -84,34 +92,34 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def fetch_pinned(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    global pinned_cache
+    global pinned_chats
 
     query = update.callback_query
     await query.answer()
 
     dialogs = await client.get_dialogs()
 
-    pinned_cache = []
+    pinned_chats = []
 
     for d in dialogs:
         if d.pinned:
-            pinned_cache.append(d)
+            pinned_chats.append(d)
 
-    if not pinned_cache:
+    if not pinned_chats:
         await query.message.reply_text("❌ No pinned chats found")
         return
 
-    text = "🎯 Select Chat Number\n\n"
+    text = "🎯 Select the Number Below\n\n"
 
-    for i, chat in enumerate(pinned_cache[:15], start=1):
+    for i, chat in enumerate(pinned_chats[:15], start=1):
         text += f"{i}. {chat.name}\n"
 
     buttons = []
     row = []
 
-    for i in range(1, min(len(pinned_cache), 15) + 1):
+    for i in range(1, min(len(pinned_chats), 15) + 1):
 
-        row.append(InlineKeyboardButton(str(i), callback_data=f"select_{i}"))
+        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
         if len(row) == 5:
             buttons.append(row)
@@ -126,27 +134,29 @@ async def fetch_pinned(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def select_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global mode
 
     query = update.callback_query
     await query.answer()
 
-    num = int(query.data.split("_")[1]) - 1
+    index = int(query.data.split("_")[1]) - 1
 
-    chat = pinned_cache[num]
+    chat = pinned_chats[index]
 
     chat_id = str(chat.id)
 
     data = load_config()
 
-    if "source_mode" in context.user_data:
+    if mode == "source":
 
         if chat_id not in data["sources"]:
             data["sources"].append(chat_id)
 
         await query.message.reply_text(f"✅ Source Added\n{chat.name}")
 
-    else:
+    elif mode == "target":
 
         if chat_id not in data["targets"]:
             data["targets"].append(chat_id)
@@ -157,6 +167,7 @@ async def select_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_startup(app):
+
     asyncio.create_task(start_userbot())
 
 
@@ -165,9 +176,10 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).post_init(on_startup).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(fetch_pinned, pattern="fetch_"))
-    app.add_handler(CallbackQueryHandler(select_chat, pattern="select_"))
-    app.add_handler(CallbackQueryHandler(panel))
+
+    app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
+    app.add_handler(CallbackQueryHandler(fetch_pinned, pattern="fetch_pins"))
+    app.add_handler(CallbackQueryHandler(add_chat, pattern="add_"))
 
     app.run_polling()
 
