@@ -18,9 +18,6 @@ msg_map = {}
 
 def load():
 
-    if not os.path.exists(CONFIG_FILE):
-        return {"sources": {}, "targets": {}, "settings": {}}
-
     with open(CONFIG_FILE) as f:
         return json.load(f)
 
@@ -37,67 +34,63 @@ async def start_userbot():
 
         data = load()
 
-        sources = data.get("sources", {})
-        targets = data.get("targets", {})
-        settings = data.get("settings", {})
+        sources = data["sources"]
+        targets = data["targets"]
+        settings = data["settings"]
 
-        # forward disabled
-        if not settings.get("forward", True):
+        if not settings["forward"]:
             return
 
-        chat_id = str(event.chat_id)
+        cid = str(event.chat_id)
 
-        if chat_id not in sources:
+        if cid not in sources:
             return
 
         text = event.message.text or ""
 
-        # blacklist filter
-        for word in settings.get("blacklist", []):
+        for word in settings["blacklist"]:
+
             if word.lower() in text.lower():
                 return
 
-        # remove usernames
-        if settings.get("remove_username"):
+        if settings["remove_username"]:
             text = re.sub(r"@\w+", "", text)
 
-        # replace links
-        if settings.get("replace_link"):
+        if settings["replace_link"]:
             text = re.sub(r"https?://\S+", settings["replace_link"], text)
 
-        # remove links
-        elif settings.get("remove_links"):
+        elif settings["remove_links"]:
             text = re.sub(r"https?://\S+", "", text)
 
-        for target_id in targets:
+        for target in targets:
 
             try:
 
-                reply_to = None
+                reply = None
 
                 if event.message.is_reply:
-                    reply_id = event.message.reply_to_msg_id
-                    reply_to = msg_map.get(reply_id, {}).get(target_id)
+                    rid = event.message.reply_to_msg_id
+                    reply = msg_map.get(rid, {}).get(target)
 
                 if event.message.media:
 
                     sent = await client.send_file(
-                        int(target_id),
+                        int(target),
                         event.message.media,
                         caption=text,
-                        reply_to=reply_to
+                        reply_to=reply
                     )
 
                 else:
 
                     sent = await client.send_message(
-                        int(target_id),
+                        int(target),
                         text,
-                        reply_to=reply_to,
+                        reply_to=reply,
                         link_preview=False
                     )
 
-                msg_map.setdefault(event.message.id, {})[target_id] = sent.id
+                msg_map.setdefault(event.message.id, {})[target] = sent.id
 
             except Exception as e:
                 print("Forward error:", e)
