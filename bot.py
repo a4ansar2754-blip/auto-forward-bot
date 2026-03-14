@@ -1,57 +1,86 @@
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    MessageHandler,
-    filters,
+ApplicationBuilder,
+CommandHandler,
+CallbackQueryHandler,
+MessageHandler,
+filters,
+ContextTypes
 )
 
-from config_manager import get_config, save_config
 from userbot_manager import login_user, clients
+from config_manager import get_config, save_config
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-chat_cache = {}
-mode = {}
 login_state = {}
-
-
-# ---------------- START PANEL ---------------- #
+mode = {}
+chat_cache = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    keyboard = [
+    kb = [
+        [InlineKeyboardButton("🔑 Login", callback_data="login")],
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
-        [InlineKeyboardButton("🗑 Remove Sources", callback_data="remove_sources")],
-        [InlineKeyboardButton("❌ Remove Targets", callback_data="remove_targets")],
-        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
-        [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")],
+        [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
     ]
 
     await update.message.reply_text(
-        "🚀 AUTO FORWARD PRO PANEL",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        "🚀 AUTO FORWARD PANEL",
+        reply_markup=InlineKeyboardMarkup(kb)
     )
 
+async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-# ---------------- LOGIN COMMAND ---------------- #
+    q = update.callback_query
+    await q.answer()
 
-async def login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = q.from_user.id
 
-    user = update.message.from_user.id
+    if q.data == "login":
 
-    login_state[user] = "PHONE"
+        login_state[user] = "PHONE"
 
-    await update.message.reply_text(
-        "📱 Send your phone number\nExample:\n+919876543210"
-    )
+        await q.message.reply_text(
+            "📱 Send phone number\nExample: +919999999999"
+        )
 
+    elif q.data == "sources":
 
-# ---------------- LOGIN FLOW ---------------- #
+        mode[user] = "source"
+
+        await q.message.reply_text(
+            "📥 Choose source",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Show Chats", callback_data="fetch")]]
+            )
+        )
+
+    elif q.data == "targets":
+
+        mode[user] = "target"
+
+        await q.message.reply_text(
+            "🎯 Choose target",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Show Chats", callback_data="fetch")]]
+            )
+        )
+
+    elif q.data == "dashboard":
+
+        data = get_config(user)
+
+        text = f"""
+📊 Dashboard
+
+Sources: {len(data["sources"])}
+Targets: {len(data["targets"])}
+"""
+
+        await q.message.reply_text(text)
 
 async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -61,222 +90,104 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text
-
     state = login_state[user]
 
     if state == "PHONE":
 
-        login_state[user] = {
-            "step": "CODE",
-            "phone": text
-        }
+        login_state[user] = {"phone": text}
 
         r = await login_user(user, text)
 
         if r == "CODE":
+            await update.message.reply_text("Send OTP")
 
-            await update.message.reply_text(
-                "📩 OTP sent\nSend OTP code"
-            )
-
-    elif isinstance(state, dict):
+    else:
 
         phone = state["phone"]
 
         r = await login_user(user, phone, code=text)
 
-        if r == "PASSWORD":
-
-            login_state[user]["step"] = "PASSWORD"
-
-            await update.message.reply_text(
-                "🔐 Send 2FA password"
-            )
-
-        elif r == "SUCCESS":
+        if r == "SUCCESS":
 
             login_state.pop(user)
 
-            await update.message.reply_text(
-                "✅ Login successful\nUserbot started"
-            )
-
-
-# ---------------- PANEL ---------------- #
-
-async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    query = update.callback_query
-    await query.answer()
-
-    user = query.from_user.id
-
-    if query.data == "sources":
-
-        mode[user] = "source"
-
-        kb = [[InlineKeyboardButton("📌 Show Chats", callback_data="fetch")]]
-
-        await query.message.reply_text(
-            "📥 Select SOURCE channel",
-            reply_markup=InlineKeyboardMarkup(kb),
-        )
-
-    elif query.data == "targets":
-
-        mode[user] = "target"
-
-        kb = [[InlineKeyboardButton("📌 Show Chats", callback_data="fetch")]]
-
-        await query.message.reply_text(
-            "🎯 Select TARGET channel",
-            reply_markup=InlineKeyboardMarkup(kb),
-        )
-
-    elif query.data == "dashboard":
-
-        await dashboard(query)
-
-
-# ---------------- FETCH CHATS ---------------- #
+            await update.message.reply_text("✅ Login success")
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
 
-    user = query.from_user.id
+    user = q.from_user.id
 
     if user not in clients:
 
-        await query.message.reply_text("❌ Login required\nUse /login first")
+        await q.message.reply_text("Login first")
         return
 
     client = clients[user]
 
     dialogs = await client.get_dialogs()
 
-    chats = dialogs[:15]
+    chats = dialogs[:10]
 
     chat_cache[user] = chats
 
-    txt = "📋 SELECT CHAT\n\n"
+    text = ""
 
-    for i, c in enumerate(chats, 1):
-        txt += f"{i}. {c.name}\n"
+    for i,c in enumerate(chats,1):
+        text += f"{i}. {c.name}\n"
 
-    btn = []
-    row = []
+    buttons = [
+        [InlineKeyboardButton(str(i), callback_data=f"add_{i}")]
+        for i in range(1,len(chats)+1)
+    ]
 
-    for i in range(1, len(chats) + 1):
-
-        row.append(
-            InlineKeyboardButton(str(i), callback_data=f"add_{i}")
-        )
-
-        if len(row) == 5:
-            btn.append(row)
-            row = []
-
-    if row:
-        btn.append(row)
-
-    await query.message.reply_text(
-        txt,
-        reply_markup=InlineKeyboardMarkup(btn),
+    await q.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
-
-
-# ---------------- ADD CHAT ---------------- #
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    query = update.callback_query
-    await query.answer()
+    q = update.callback_query
+    await q.answer()
 
-    user = query.from_user.id
+    user = q.from_user.id
 
-    index = int(query.data.split("_")[1]) - 1
+    idx = int(q.data.split("_")[1])-1
 
-    chats = chat_cache[user]
-
-    chat = chats[index]
-
-    cid = str(chat.id)
-    name = chat.name
+    chat = chat_cache[user][idx]
 
     data = get_config(user)
 
     if mode[user] == "source":
 
-        if cid in data["sources"]:
+        data["sources"][str(chat.id)] = chat.name
 
-            await query.message.reply_text(
-                f"❌ Already SOURCE\n{name}"
-            )
-            return
+        await q.message.reply_text("Source added")
 
-        data["sources"][cid] = name
+    else:
 
-        await query.message.reply_text(
-            f"✅ SOURCE ADDED\n{name}"
-        )
+        data["targets"][str(chat.id)] = chat.name
 
-    elif mode[user] == "target":
+        await q.message.reply_text("Target added")
 
-        if cid in data["targets"]:
-
-            await query.message.reply_text(
-                f"❌ Already TARGET\n{name}"
-            )
-            return
-
-        data["targets"][cid] = name
-
-        await query.message.reply_text(
-            f"🎯 TARGET ADDED\n{name}"
-        )
-
-    save_config(user, data)
-
-
-# ---------------- DASHBOARD ---------------- #
-
-async def dashboard(query):
-
-    user = query.from_user.id
-
-    data = get_config(user)
-
-    txt = f"""
-📊 BOT DASHBOARD
-
-📥 Sources : {len(data["sources"])}
-🎯 Targets : {len(data["targets"])}
-"""
-
-    await query.message.reply_text(txt)
-
-
-# ---------------- MAIN ---------------- #
+    save_config(user,data)
 
 def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("login", login))
-
-    app.add_handler(MessageHandler(filters.TEXT, login_flow))
-
     app.add_handler(CallbackQueryHandler(panel))
     app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
     app.add_handler(CallbackQueryHandler(add, pattern="add_"))
+    app.add_handler(MessageHandler(filters.TEXT, login_flow))
 
-    print("BOT STARTED")
+    print("BOT RUNNING")
 
     app.run_polling()
-
 
 if __name__ == "__main__":
     main()
