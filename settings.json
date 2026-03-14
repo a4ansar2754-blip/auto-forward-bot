@@ -1,11 +1,12 @@
 {
-  "forward": true,
-  "hide_header": true,
-  "media": true,
-  "preview": true,
-  "remove_links": false,
-  "remove_username": true,
-  "auto_delete": false,
-  "auto_delete_time": 30,
-  "blacklist": []
+  "sources": {},
+  "targets": {},
+  "settings": {
+    "forward": true,
+    "media": true,
+    "remove_links": false,
+    "remove_username": false,
+    "auto_delete": false,
+    "blacklist": []
+  }
 }
