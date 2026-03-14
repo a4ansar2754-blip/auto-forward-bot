@@ -6,5 +6,6 @@
   "remove_links": false,
   "remove_username": true,
   "auto_delete": false,
+  "auto_delete_time": 30,
   "blacklist": []
 }
