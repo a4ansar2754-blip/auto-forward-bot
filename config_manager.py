@@ -17,7 +17,6 @@ def get_config(user):
             "targets": [],
             "keywords": [],
             "replace_link": "",
-            "remove_links": False,
             "header": "",
             "footer": "",
             "delay": 0,
@@ -31,7 +30,6 @@ def get_config(user):
 
     with open(path) as f:
         return json.load(f)
-
 
 def save_config(user, data):
 
