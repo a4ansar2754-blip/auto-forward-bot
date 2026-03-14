@@ -3,25 +3,32 @@ import json
 import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ContextTypes
+)
 
 from userbot import client, start_userbot
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 CONFIG_FILE = "config.json"
 
 chat_list = []
 mode = None
+waiting_blacklist = False
+waiting_replace = False
 
-
-# ---------------- CONFIG ----------------
 
 def load_config():
 
     if not os.path.exists(CONFIG_FILE):
 
         with open(CONFIG_FILE, "w") as f:
+
             json.dump({
                 "sources": {},
                 "targets": {},
@@ -30,6 +37,7 @@ def load_config():
                     "media": True,
                     "remove_links": False,
                     "remove_username": False,
+                    "replace_link": "",
                     "auto_delete": False,
                     "blacklist": []
                 }
@@ -45,30 +53,27 @@ def save_config(data):
         json.dump(data, f, indent=4)
 
 
-# ---------------- START PANEL ----------------
+def icon(v):
+    return "🟢" if v else "🔴"
+
+
+# ---------- START PANEL ----------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
-
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
-
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
-
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
-
     ]
 
     await update.message.reply_text(
-
-        "🚀 AUTO FORWARD PANEL\n\nChoose option 👇",
-
+        "🚀 AUTO FORWARD PANEL",
         reply_markup=InlineKeyboardMarkup(keyboard)
-
     )
 
 
-# ---------------- PANEL ----------------
+# ---------- PANEL ----------
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -81,58 +86,48 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         mode = "source"
 
-        keyboard = [[InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_chats")]]
+        kb = [[InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]]
 
         await query.message.reply_text(
-
-            "📥 Add SOURCE channel\n\nClick button below 👇",
-
-            reply_markup=InlineKeyboardMarkup(keyboard)
-
+            "Add SOURCE channel",
+            reply_markup=InlineKeyboardMarkup(kb)
         )
 
     elif query.data == "targets":
 
         mode = "target"
 
-        keyboard = [[InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_chats")]]
+        kb = [[InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]]
 
         await query.message.reply_text(
-
-            "🎯 Add TARGET channel\n\nClick button below 👇",
-
-            reply_markup=InlineKeyboardMarkup(keyboard)
-
+            "Add TARGET channel",
+            reply_markup=InlineKeyboardMarkup(kb)
         )
 
     elif query.data == "dashboard":
 
         data = load_config()
+        s = data["settings"]
 
-        text = "📊 DASHBOARD\n\n"
+        text = f"""
+⚙ BOT DASHBOARD
 
-        text += "📥 SOURCES\n"
+Forward: {icon(s["forward"])}
+Media: {icon(s["media"])}
+Remove Links: {icon(s["remove_links"])}
+Remove Username: {icon(s["remove_username"])}
+Auto Delete: {icon(s["auto_delete"])}
 
-        if data["sources"]:
-            for s in data["sources"].values():
-                text += f"• {s}\n"
-        else:
-            text += "None\n"
-
-        text += "\n🎯 TARGETS\n"
-
-        if data["targets"]:
-            for t in data["targets"].values():
-                text += f"• {t}\n"
-        else:
-            text += "None\n"
+Blacklist: {len(s["blacklist"])} words
+Replace Link: {s["replace_link"] or "None"}
+"""
 
         await query.message.reply_text(text)
 
 
-# ---------------- FETCH CHATS ----------------
+# ---------- FETCH CHATS ----------
 
-async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global chat_list
 
@@ -143,37 +138,31 @@ async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_list = dialogs[:15]
 
-    text = "📋 SELECT CHAT NUMBER\n\n"
+    txt = "Select chat\n\n"
 
-    for i, chat in enumerate(chat_list, start=1):
-        text += f"{i}. {chat.name}\n"
+    for i, c in enumerate(chat_list, 1):
+        txt += f"{i}. {c.name}\n"
 
-    buttons = []
+    btn = []
     row = []
 
     for i in range(1, len(chat_list) + 1):
 
-        row.append(InlineKeyboardButton(str(i), callback_data=f"addchat_{i}"))
+        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
         if len(row) == 5:
-            buttons.append(row)
+            btn.append(row)
             row = []
 
     if row:
-        buttons.append(row)
+        btn.append(row)
 
-    await query.message.reply_text(
-
-        text,
-
-        reply_markup=InlineKeyboardMarkup(buttons)
-
-    )
+    await query.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(btn))
 
 
-# ---------------- ADD CHAT ----------------
+# ---------- ADD CHAT ----------
 
-async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     global mode
 
@@ -182,143 +171,94 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     index = int(query.data.split("_")[1]) - 1
 
-    if index >= len(chat_list):
-        await query.message.reply_text("❌ Invalid selection")
-        return
-
     chat = chat_list[index]
 
-    chat_id = str(chat.id)
-    chat_name = chat.name
+    cid = str(chat.id)
+    name = chat.name
 
     data = load_config()
 
     if mode == "source":
 
-        if chat_id in data["sources"]:
-            await query.message.reply_text("❌ Already added in Sources")
+        if cid in data["sources"]:
+            await query.message.reply_text("Already source")
             return
 
-        data["sources"][chat_id] = chat_name
-
-        await query.message.reply_text(f"✅ SOURCE ADDED\n📥 {chat_name}")
+        data["sources"][cid] = name
+        await query.message.reply_text(f"Added source {name}")
 
     elif mode == "target":
 
-        if chat_id in data["targets"]:
-            await query.message.reply_text("❌ Already added in Targets")
+        if cid in data["targets"]:
+            await query.message.reply_text("Already target")
             return
 
-        data["targets"][chat_id] = chat_name
-
-        await query.message.reply_text(f"✅ TARGET ADDED\n🎯 {chat_name}")
+        data["targets"][cid] = name
+        await query.message.reply_text(f"Added target {name}")
 
     save_config(data)
 
 
-# ---------------- SETTINGS COMMANDS ----------------
+# ---------- BLACKLIST ----------
 
-async def forward_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["forward"] = True
-    save_config(data)
-    await update.message.reply_text("✅ Forwarding ON")
+async def blacklist_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    global waiting_blacklist
 
-async def forward_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["forward"] = False
-    save_config(data)
-    await update.message.reply_text("❌ Forwarding OFF")
+    waiting_blacklist = True
+
+    await update.message.reply_text("Send words separated by comma")
 
 
-async def media_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["media"] = True
-    save_config(data)
-    await update.message.reply_text("📸 Media Forwarding ON")
+async def replace_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    global waiting_replace
+
+    waiting_replace = True
+
+    await update.message.reply_text("Send link to replace")
 
 
-async def media_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["media"] = False
-    save_config(data)
-    await update.message.reply_text("📸 Media Forwarding OFF")
+async def message_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-
-async def links_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["remove_links"] = True
-    save_config(data)
-    await update.message.reply_text("🔗 Links Removal ON")
-
-
-async def links_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["remove_links"] = False
-    save_config(data)
-    await update.message.reply_text("🔗 Links Removal OFF")
-
-
-async def username_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["remove_username"] = True
-    save_config(data)
-    await update.message.reply_text("👤 Username Removal ON")
-
-
-async def username_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["remove_username"] = False
-    save_config(data)
-    await update.message.reply_text("👤 Username Removal OFF")
-
-
-async def autodelete_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["auto_delete"] = True
-    save_config(data)
-    await update.message.reply_text("🗑 Auto Delete ON")
-
-
-async def autodelete_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    data = load_config()
-    data["settings"]["auto_delete"] = False
-    save_config(data)
-    await update.message.reply_text("🗑 Auto Delete OFF")
-
-
-async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global waiting_blacklist, waiting_replace
 
     data = load_config()
-    s = data["settings"]
 
-    text = f"""
-⚙ CURRENT SETTINGS
+    if waiting_blacklist:
 
-Forward: {s["forward"]}
-Media: {s["media"]}
-Remove Links: {s["remove_links"]}
-Remove Username: {s["remove_username"]}
-Auto Delete: {s["auto_delete"]}
-Blacklist: {s["blacklist"]}
-"""
+        words = [w.strip() for w in update.message.text.split(",")]
 
-    await update.message.reply_text(text)
+        data["settings"]["blacklist"] += words
+
+        save_config(data)
+
+        waiting_blacklist = False
+
+        await update.message.reply_text("Blacklist saved")
+
+    elif waiting_replace:
+
+        data["settings"]["replace_link"] = update.message.text
+
+        save_config(data)
+
+        waiting_replace = False
+
+        await update.message.reply_text("Replace link saved")
 
 
-# ---------------- USERBOT START ----------------
+# ---------- USERBOT START ----------
 
-async def on_startup(app):
-
+async def startup(app):
     asyncio.create_task(start_userbot())
 
 
-# ---------------- MAIN ----------------
+# ---------- MAIN ----------
 
 def main():
 
-    app = ApplicationBuilder().token(BOT_TOKEN).post_init(on_startup).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(startup).build()
 
     app.add_handler(CommandHandler("start", start))
 
@@ -334,16 +274,14 @@ def main():
     app.add_handler(CommandHandler("username_on", username_on))
     app.add_handler(CommandHandler("username_off", username_off))
 
-    app.add_handler(CommandHandler("autodelete_on", autodelete_on))
-    app.add_handler(CommandHandler("autodelete_off", autodelete_off))
+    app.add_handler(CommandHandler("blacklist_add", blacklist_add))
+    app.add_handler(CommandHandler("set_replace_link", replace_link))
 
-    app.add_handler(CommandHandler("settings", settings))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_input))
 
-    app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|dashboard)$"))
-
-    app.add_handler(CallbackQueryHandler(fetch_chats, pattern="^fetch_chats$"))
-
-    app.add_handler(CallbackQueryHandler(add_chat, pattern=r"^addchat_\d+$"))
+    app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
+    app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
+    app.add_handler(CallbackQueryHandler(add, pattern=r"^add_\d+$"))
 
     print("BOT STARTED")
 
