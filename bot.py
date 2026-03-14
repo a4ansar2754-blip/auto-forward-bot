@@ -57,7 +57,7 @@ def icon(v):
     return "🟢" if v else "🔴"
 
 
-# ---------- START ----------
+# START PANEL
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -73,7 +73,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-# ---------- PANEL ----------
+# PANEL
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -117,14 +117,14 @@ Media: {icon(s["media"])}
 Remove Links: {icon(s["remove_links"])}
 Remove Username: {icon(s["remove_username"])}
 
-Blacklist: {len(s["blacklist"])} words
+Blacklist Words: {len(s["blacklist"])}
 Replace Link: {s["replace_link"] or "None"}
 """
 
         await query.message.reply_text(text)
 
 
-# ---------- FETCH CHATS ----------
+# FETCH CHATS
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -159,7 +159,7 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(btn))
 
 
-# ---------- ADD CHAT ----------
+# ADD CHAT
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -200,27 +200,25 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_config(data)
 
 
-# ---------- SETTINGS ----------
+# SETTINGS COMMANDS
 
 async def forward_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    d = load_config()
-    d["settings"]["forward"] = True
-    save_config(d)
+    data = load_config()
+    data["settings"]["forward"] = True
+    save_config(data)
 
     await update.message.reply_text("🟢 Forwarding ON")
 
 
 async def forward_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    d = load_config()
-    d["settings"]["forward"] = False
-    save_config(d)
+    data = load_config()
+    data["settings"]["forward"] = False
+    save_config(data)
 
     await update.message.reply_text("🔴 Forwarding OFF")
 
-
-# ---------- BLACKLIST ----------
 
 async def blacklist_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -237,7 +235,7 @@ async def replace_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     waiting_replace = True
 
-    await update.message.reply_text("Send link")
+    await update.message.reply_text("Send link to replace all links")
 
 
 async def message_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -288,6 +286,8 @@ def main():
     app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
     app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
     app.add_handler(CallbackQueryHandler(add, pattern=r"^add_\d+$"))
+
+    print("BOT STARTED")
 
     app.run_polling()
 
