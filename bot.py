@@ -1,9 +1,12 @@
 import os
 import json
 import asyncio
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+
 from userbot import client, start_userbot
+
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -33,15 +36,21 @@ def save_config(data):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     keyboard = [
+
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
+
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
+
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
+
     ]
 
     await update.message.reply_text(
-        "🚀 **Auto Forward Panel**\n\nSelect option below 👇",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
+
+        "🚀 Auto Forward Panel\n\nSelect option below 👇",
+
+        reply_markup=InlineKeyboardMarkup(keyboard)
+
     )
 
 
@@ -50,6 +59,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
     query = update.callback_query
+
     await query.answer()
 
     if query.data == "sources":
@@ -57,13 +67,17 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "source"
 
         keyboard = [
+
             [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
+
         ]
 
         await query.message.reply_text(
-            "📥 **Add Source Channels**\n\nClick button below 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+
+            "📥 Add Source Channels\n\nClick button below 👇",
+
+            reply_markup=InlineKeyboardMarkup(keyboard)
+
         )
 
     elif query.data == "targets":
@@ -71,38 +85,50 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "target"
 
         keyboard = [
+
             [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch")]
+
         ]
 
         await query.message.reply_text(
-            "🎯 **Add Target Channels**\n\nClick button below 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+
+            "🎯 Add Target Channels\n\nClick button below 👇",
+
+            reply_markup=InlineKeyboardMarkup(keyboard)
+
         )
 
     elif query.data == "dashboard":
 
         data = load_config()
 
-        text = "📊 **Forwarding Dashboard**\n\n"
+        text = "📊 Forwarding Dashboard\n\n"
 
-        text += "📥 **Sources**\n"
+        text += "📥 Sources\n"
 
         if data["sources"]:
+
             for name in data["sources"].values():
+
                 text += f"• {name}\n"
+
         else:
+
             text += "None\n"
 
-        text += "\n🎯 **Targets**\n"
+        text += "\n🎯 Targets\n"
 
         if data["targets"]:
+
             for name in data["targets"].values():
+
                 text += f"• {name}\n"
+
         else:
+
             text += "None\n"
 
-        await query.message.reply_text(text, parse_mode="Markdown")
+        await query.message.reply_text(text)
 
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -110,13 +136,14 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global chat_list
 
     query = update.callback_query
+
     await query.answer()
 
     dialogs = await client.get_dialogs()
 
     chat_list = dialogs[:15]
 
-    text = "📋 **Select Chat Number**\n\n"
+    text = "📋 Select Chat Number\n\n"
 
     for i, chat in enumerate(chat_list, start=1):
 
@@ -128,7 +155,11 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for i in range(1, len(chat_list) + 1):
 
-        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
+        row.append(
+
+            InlineKeyboardButton(str(i), callback_data=f"add_{i}")
+
+        )
 
         if len(row) == 5:
 
@@ -141,9 +172,11 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons.append(row)
 
     await query.message.reply_text(
+
         text,
-        reply_markup=InlineKeyboardMarkup(buttons),
-        parse_mode="Markdown"
+
+        reply_markup=InlineKeyboardMarkup(buttons)
+
     )
 
 
@@ -152,6 +185,7 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
     query = update.callback_query
+
     await query.answer()
 
     index = int(query.data.split("_")[1]) - 1
@@ -169,8 +203,9 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["sources"][chat_id] = chat_name
 
         await query.message.reply_text(
-            f"✅ **Source Added**\n📥 {chat_name}",
-            parse_mode="Markdown"
+
+            f"✅ Source Added\n📥 {chat_name}"
+
         )
 
     elif mode == "target":
@@ -178,8 +213,9 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         data["targets"][chat_id] = chat_name
 
         await query.message.reply_text(
-            f"✅ **Target Added**\n🎯 {chat_name}",
-            parse_mode="Markdown"
+
+            f"✅ Target Added\n🎯 {chat_name}"
+
         )
 
     save_config(data)
@@ -202,10 +238,11 @@ def main():
 
     app.add_handler(CallbackQueryHandler(add_chat, pattern="add_"))
 
-    print("🚀 BOT STARTED")
+    print("BOT STARTED")
 
     app.run_polling()
 
 
 if __name__ == "__main__":
+
     main()
