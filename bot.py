@@ -20,6 +20,9 @@ login_state = {}
 phone_data = {}
 mode_state = {}
 
+
+# ---------------- PANEL ---------------- #
+
 def main_panel():
 
     keyboard = [
@@ -39,6 +42,8 @@ def main_panel():
 
     return InlineKeyboardMarkup(keyboard)
 
+
+# ---------------- CHAT BUTTONS ---------------- #
 
 def chat_buttons():
 
@@ -65,6 +70,8 @@ def chat_buttons():
     return InlineKeyboardMarkup(rows)
 
 
+# ---------------- START ---------------- #
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
@@ -72,6 +79,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=main_panel()
     )
 
+
+# ---------------- LOGIN COMMAND ---------------- #
 
 async def login(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -84,7 +93,9 @@ async def login(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------- LOGIN FLOW (OTP FIXED) ---------------- #
+
+async def login_flow(update, context):
 
     user = update.effective_user.id
     text = update.message.text
@@ -98,24 +109,36 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         phone_data[user] = text
 
-        r = await login_user(user, text)
+        r = await login_user(user, phone=text)
 
         if r == "CODE":
 
             login_state[user] = "OTP"
 
-            await update.message.reply_text("Send OTP")
+            await update.message.reply_text(
+                "📲 OTP Sent\n\nSend OTP now"
+            )
 
     elif state == "OTP":
 
-        r = await login_user(user, phone_data[user], code=text)
+        r = await login_user(user, code=text)
 
         if r == "SUCCESS":
 
             login_state.pop(user)
 
-            await update.message.reply_text("✅ Login Success")
+            await update.message.reply_text(
+                "✅ LOGIN SUCCESS\n\nSession saved."
+            )
 
+        else:
+
+            await update.message.reply_text(
+                "❌ OTP Wrong. Try again."
+            )
+
+
+# ---------------- BUTTON HANDLER ---------------- #
 
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -138,7 +161,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode_state[user] = "SOURCE"
 
         await query.message.reply_text(
-            "Select source from chats"
+            "Select SOURCE from chats"
         )
 
     elif data == "addtgt":
@@ -146,7 +169,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode_state[user] = "TARGET"
 
         await query.message.reply_text(
-            "Select target from chats"
+            "Select TARGET from chats"
         )
 
     elif data == "showchats":
@@ -174,14 +197,22 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if mode_state.get(user) == "SOURCE":
 
             if chat_id not in config["sources"]:
+
                 config["sources"].append(chat_id)
-                await query.message.reply_text("✅ SOURCE ADDED")
+
+                await query.message.reply_text(
+                    "✅ SOURCE ADDED"
+                )
 
         elif mode_state.get(user) == "TARGET":
 
             if chat_id not in config["targets"]:
+
                 config["targets"].append(chat_id)
-                await query.message.reply_text("✅ TARGET ADDED")
+
+                await query.message.reply_text(
+                    "✅ TARGET ADDED"
+                )
 
         save_config(user, config)
 
@@ -189,13 +220,17 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await start_engine(user)
 
-        await query.message.reply_text("🚀 Forward Started")
+        await query.message.reply_text(
+            "🚀 Forward Started"
+        )
 
     elif data == "stop":
 
         await stop_engine(user)
 
-        await query.message.reply_text("⛔ Forward Stopped")
+        await query.message.reply_text(
+            "⛔ Forward Stopped"
+        )
 
     elif data == "dash":
 
@@ -214,6 +249,8 @@ Status : {status}
 
         await query.message.reply_text(text)
 
+
+# ---------------- MAIN ---------------- #
 
 def main():
 
