@@ -10,8 +10,9 @@ if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
 
 clients = {}
+login_data = {}
 
-async def login_user(user, phone, code=None):
+async def login_user(user, phone=None, code=None):
 
     session = f"{SESSION_DIR}/{user}"
 
@@ -19,15 +20,35 @@ async def login_user(user, phone, code=None):
 
     await client.connect()
 
-    if not await client.is_user_authorized():
+    # STEP 1 SEND CODE
+    if code is None:
 
-        if code is None:
-            await client.send_code_request(phone)
-            return "CODE"
+        result = await client.send_code_request(phone)
 
-        else:
-            await client.sign_in(phone, code)
+        login_data[user] = {
+            "phone": phone,
+            "phone_code_hash": result.phone_code_hash,
+            "client": client
+        }
+
+        return "CODE"
+
+    # STEP 2 VERIFY OTP
+    data = login_data.get(user)
+
+    if not data:
+        return "ERROR"
+
+    client = data["client"]
+
+    await client.sign_in(
+        phone=data["phone"],
+        code=code,
+        phone_code_hash=data["phone_code_hash"]
+    )
 
     clients[user] = client
+
+    login_data.pop(user)
 
     return "SUCCESS"
