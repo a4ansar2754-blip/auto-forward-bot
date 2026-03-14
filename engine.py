@@ -1,10 +1,13 @@
 import asyncio
 import re
 from telethon import events
+
 from userbot_manager import clients
 from config_manager import get_config
 
-running_engines = {}
+running = {}
+reply_map = {}
+album_cache = {}
 
 
 async def start_engine(user):
@@ -14,75 +17,126 @@ async def start_engine(user):
 
     client = clients[user]
 
-    if user in running_engines:
+    if user in running:
         return
 
-    running_engines[user] = True
+    running[user] = True
 
     config = get_config(user)
 
-    sources = config.get("sources", {})
-    targets = config.get("targets", {})
+    sources = config["sources"]
+    targets = config["targets"]
 
-    blacklist = config.get("blacklist", [])
-    replace_links = config.get("replace_links", {})
-    header = config.get("header", "")
-    footer = config.get("footer", "")
-    delay = config.get("delay", 0)
-    auto_delete = config.get("auto_delete", 0)
-
-    @client.on(events.NewMessage(chats=list(sources.values())))
+    @client.on(events.NewMessage(chats=sources))
     async def handler(event):
 
         msg = event.message
-
         text = msg.text or ""
 
-        # KEYWORD BLOCK
-        for word in blacklist:
-            if word.lower() in text.lower():
+        config = get_config(user)
+
+        # keyword block
+        for k in config["keywords"]:
+            if k.lower() in text.lower():
                 return
 
-        # LINK REMOVE
-        text = re.sub(r"http\S+", "", text)
+        # link replace
+        if config["replace_link"]:
+            text = re.sub(r"http\S+", config["replace_link"], text)
 
-        # LINK REPLACE
-        for old, new in replace_links.items():
-            text = text.replace(old, new)
+        # link remove
+        elif config["remove_links"]:
+            text = re.sub(r"http\S+", "", text)
 
-        # HEADER FOOTER
-        if header:
-            text = f"{header}\n\n{text}"
+        # header footer
+        if config["header"]:
+            text = config["header"] + "\n\n" + text
 
-        if footer:
-            text = f"{text}\n\n{footer}"
+        if config["footer"]:
+            text = text + "\n\n" + config["footer"]
 
-        # DELAY
-        if delay > 0:
-            await asyncio.sleep(delay)
+        # delay
+        if config["delay"]:
+            await asyncio.sleep(config["delay"])
 
-        for target in targets.values():
+        for target in targets:
 
             try:
 
-                sent = await client.send_message(
+                reply_id = None
+
+                if msg.reply_to_msg_id in reply_map:
+                    reply_id = reply_map[msg.reply_to_msg_id]
+
+                # album grouping
+                if msg.grouped_id:
+
+                    album_cache.setdefault(msg.grouped_id, []).append(msg)
+
+                    await asyncio.sleep(1)
+
+                    msgs = album_cache.pop(msg.grouped_id, [])
+
+                    files = [m.media for m in msgs]
+
+                    sent = await client.send_file(
+                        target,
+                        files,
+                        caption=text
+                    )
+
+                # media
+                elif msg.media:
+
+                    sent = await client.send_file(
+                        target,
+                        msg.media,
+                        caption=text,
+                        reply_to=reply_id
+                    )
+
+                else:
+
+                    sent = await client.send_message(
+                        target,
+                        text,
+                        reply_to=reply_id
+                    )
+
+                reply_map[msg.id] = sent.id
+
+                # auto delete
+                if config["autodelete"]:
+
+                    await asyncio.sleep(config["autodelete"])
+
+                    await client.delete_messages(target, sent.id)
+
+            except Exception as e:
+                print(e)
+
+    # edit sync
+    @client.on(events.MessageEdited(chats=sources))
+    async def edit_sync(event):
+
+        if event.message.id not in reply_map:
+            return
+
+        for target in targets:
+
+            try:
+
+                await client.edit_message(
                     target,
-                    text,
-                    file=msg.media
+                    reply_map[event.message.id],
+                    event.text
                 )
 
-                # AUTO DELETE
-                if auto_delete > 0:
-
-                    await asyncio.sleep(auto_delete)
-
-                    await sent.delete()
-
-            except Exception:
+            except:
                 pass
 
 
 async def stop_engine(user):
 
-    if user in running_engines:
-        running_engines.pop(user)
+    if user in running:
+        running.pop(user)
