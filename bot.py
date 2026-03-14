@@ -9,16 +9,14 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 CONFIG_FILE = "config.json"
 
-pinned_chats = []
+chat_list = []
 mode = None
 
-
-# ================= CONFIG =================
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "w") as f:
-            json.dump({"sources": [], "targets": []}, f)
+            json.dump({"sources": {}, "targets": {}}, f)
 
     with open(CONFIG_FILE) as f:
         return json.load(f)
@@ -28,8 +26,6 @@ def save_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-
-# ================= START =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -41,11 +37,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "🚀 **Auto Forward Panel**\n\nSelect option below 👇",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
     )
 
-
-# ================= PANEL =================
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -59,14 +54,13 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "source"
 
         keyboard = [
-            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_pins")]
+            [InlineKeyboardButton("📂 Show Chats", callback_data="fetch_chats")]
         ]
 
         await query.message.reply_text(
-            "📥 **Add Source Channels**\n\n"
-            "1️⃣ Pin the channels\n"
-            "2️⃣ Click button below 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "📥 **Add Source Channels**\n\nClick button to load chats 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
         )
 
     elif query.data == "targets":
@@ -74,13 +68,13 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         mode = "target"
 
         keyboard = [
-            [InlineKeyboardButton("📌 I have pinned the chats", callback_data="fetch_pins")]
+            [InlineKeyboardButton("📂 Show Chats", callback_data="fetch_chats")]
         ]
 
         await query.message.reply_text(
-            "🎯 **Add Target Channels**\n\n"
-            "Pin target channels then press button 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "🎯 **Add Target Channels**\n\nClick button to load chats 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
         )
 
     elif query.data == "dashboard":
@@ -92,60 +86,44 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "📥 **Sources**\n"
 
         if data["sources"]:
-            for s in data["sources"]:
-                try:
-                    chat = await client.get_entity(int(s))
-                    text += f"• {chat.title}\n"
-                except:
-                    text += "• Unknown channel\n"
+            for name in data["sources"].values():
+                text += f"• {name}\n"
         else:
             text += "None\n"
 
         text += "\n🎯 **Targets**\n"
 
         if data["targets"]:
-            for t in data["targets"]:
-                try:
-                    chat = await client.get_entity(int(t))
-                    text += f"• {chat.title}\n"
-                except:
-                    text += "• Unknown channel\n"
+            for name in data["targets"].values():
+                text += f"• {name}\n"
         else:
             text += "None\n"
 
-        await query.message.reply_text(text)
+        await query.message.reply_text(text, parse_mode="Markdown")
 
 
-# ================= FETCH PINNED =================
+async def fetch_chats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-async def fetch_pinned(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    global pinned_chats
+    global chat_list
 
     query = update.callback_query
     await query.answer()
 
     dialogs = await client.get_dialogs()
 
-    pinned_chats = [d for d in dialogs if d.pinned]
-
-    if not pinned_chats:
-        await query.message.reply_text("❌ No pinned chats found")
-        return
+    chat_list = dialogs[:15]
 
     text = "📋 **Select Chat Number**\n\n"
 
-    for i, chat in enumerate(pinned_chats[:15], start=1):
+    for i, chat in enumerate(chat_list, start=1):
         text += f"{i}. {chat.name}\n"
 
     buttons = []
     row = []
 
-    for i in range(1, min(len(pinned_chats), 15) + 1):
+    for i in range(1, len(chat_list) + 1):
 
-        row.append(
-            InlineKeyboardButton(f"{i}️⃣", callback_data=f"add_{i}")
-        )
+        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
         if len(row) == 5:
             buttons.append(row)
@@ -156,11 +134,10 @@ async def fetch_pinned(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         text,
-        reply_markup=InlineKeyboardMarkup(buttons)
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown"
     )
 
-
-# ================= ADD CHAT =================
 
 async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -171,43 +148,37 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     index = int(query.data.split("_")[1]) - 1
 
-    chat = pinned_chats[index]
+    chat = chat_list[index]
 
     chat_id = str(chat.id)
+    chat_name = chat.name
 
     data = load_config()
 
     if mode == "source":
 
-        if chat_id not in data["sources"]:
-            data["sources"].append(chat_id)
-            save_config(data)
+        data["sources"][chat_id] = chat_name
 
-            await query.message.reply_text(f"✅ **Source Added**\n📥 {chat.name}")
-
-        else:
-            await query.message.reply_text("⚠️ Source already added")
+        await query.message.reply_text(
+            f"✅ **Source Added**\n📥 {chat_name}",
+            parse_mode="Markdown"
+        )
 
     elif mode == "target":
 
-        if chat_id not in data["targets"]:
-            data["targets"].append(chat_id)
-            save_config(data)
+        data["targets"][chat_id] = chat_name
 
-            await query.message.reply_text(f"✅ **Target Added**\n🎯 {chat.name}")
+        await query.message.reply_text(
+            f"✅ **Target Added**\n🎯 {chat_name}",
+            parse_mode="Markdown"
+        )
 
-        else:
-            await query.message.reply_text("⚠️ Target already added")
+    save_config(data)
 
-
-# ================= START USERBOT =================
 
 async def on_startup(app):
-
     asyncio.create_task(start_userbot())
 
-
-# ================= MAIN =================
 
 def main():
 
@@ -216,7 +187,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
 
     app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
-    app.add_handler(CallbackQueryHandler(fetch_pinned, pattern="fetch_pins"))
+    app.add_handler(CallbackQueryHandler(fetch_chats, pattern="fetch_chats"))
     app.add_handler(CallbackQueryHandler(add_chat, pattern="add_"))
 
     print("🚀 BOT STARTED")
