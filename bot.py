@@ -44,7 +44,7 @@ async def main():
 
     print("BOT RUNNING")
 
-    # start telegram account
+    # start userbot
     asyncio.create_task(start_userbot())
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -52,11 +52,10 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(panel))
 
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
+    print("BOT STARTED")
 
-    await asyncio.Event().wait()
+    await app.run_polling()
 
 
-asyncio.get_event_loop().run_until_complete(main())
+if __name__ == "__main__":
+    asyncio.run(main())
