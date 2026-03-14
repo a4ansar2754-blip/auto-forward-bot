@@ -1,27 +1,32 @@
-import json
 import os
+from telethon import TelegramClient
 
-os.makedirs("configs", exist_ok=True)
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
 
-def get_config(user):
+clients = {}
 
-    path = f"configs/{user}.json"
+os.makedirs("sessions",exist_ok=True)
 
-    if not os.path.exists(path):
+async def login_user(user,phone,code=None):
 
-        data = {"sources":{}, "targets":{}}
+    session=f"sessions/{user}"
 
-        with open(path,"w") as f:
-            json.dump(data,f)
+    client=TelegramClient(session,API_ID,API_HASH)
 
-        return data
+    await client.connect()
 
-    with open(path) as f:
-        return json.load(f)
+    if not await client.is_user_authorized():
 
-def save_config(user,data):
+        if code is None:
 
-    path = f"configs/{user}.json"
+            await client.send_code_request(phone)
+            return "CODE"
 
-    with open(path,"w") as f:
-        json.dump(data,f)
+        else:
+
+            await client.sign_in(phone,code)
+
+    clients[user]=client
+
+    return "SUCCESS"
