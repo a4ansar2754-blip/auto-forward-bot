@@ -4,10 +4,10 @@ import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-ApplicationBuilder,
-CommandHandler,
-CallbackQueryHandler,
-ContextTypes
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
 )
 
 from userbot import client, start_userbot
@@ -20,35 +20,13 @@ mode = None
 
 
 def load_config():
-
-    if not os.path.exists(CONFIG_FILE):
-
-        with open(CONFIG_FILE,"w") as f:
-
-            json.dump({
-
-                "sources":{},
-                "targets":{},
-                "settings":{
-                    "forward":True,
-                    "media":True,
-                    "remove_links":False,
-                    "remove_username":False,
-                    "auto_delete":False,
-                    "blacklist":[],
-                    "replace_link":""
-                }
-
-            },f)
-
     with open(CONFIG_FILE) as f:
         return json.load(f)
 
 
 def save_config(data):
-
-    with open(CONFIG_FILE,"w") as f:
-        json.dump(data,f,indent=4)
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 def icon(v):
@@ -57,88 +35,69 @@ def icon(v):
 
 # ---------------- START PANEL ----------------
 
-async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
-
-    keyboard=[
-
-        [InlineKeyboardButton("📥 Add Sources",callback_data="sources")],
-        [InlineKeyboardButton("🎯 Add Targets",callback_data="targets")],
-        [InlineKeyboardButton("📊 Dashboard",callback_data="dashboard")]
-
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
+        [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
+        [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")],
     ]
-
     await update.message.reply_text(
-
-        "🚀 AUTO FORWARD PANEL\n\nChoose option 👇",
-
-        reply_markup=InlineKeyboardMarkup(keyboard)
-
+        "🚀 AUTO FORWARD PANEL",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
 
 # ---------------- PANEL ----------------
 
-async def panel(update:Update,context:ContextTypes.DEFAULT_TYPE):
-
+async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
-    query=update.callback_query
+    query = update.callback_query
     await query.answer()
 
-    if query.data=="sources":
-
-        mode="source"
-
-        kb=[[InlineKeyboardButton("📌 Show Chats",callback_data="fetch")]]
-
+    if query.data == "sources":
+        mode = "source"
+        kb = [[InlineKeyboardButton("📌 Show Chats", callback_data="fetch")]]
         await query.message.reply_text(
-
             "📥 Select SOURCE channel",
-
-            reply_markup=InlineKeyboardMarkup(kb)
-
+            reply_markup=InlineKeyboardMarkup(kb),
         )
 
-
-    elif query.data=="targets":
-
-        mode="target"
-
-        kb=[[InlineKeyboardButton("📌 Show Chats",callback_data="fetch")]]
-
+    elif query.data == "targets":
+        mode = "target"
+        kb = [[InlineKeyboardButton("📌 Show Chats", callback_data="fetch")]]
         await query.message.reply_text(
-
             "🎯 Select TARGET channel",
-
-            reply_markup=InlineKeyboardMarkup(kb)
-
+            reply_markup=InlineKeyboardMarkup(kb),
         )
 
+    elif query.data == "dashboard":
+        await dashboard(update, context)
 
-    elif query.data=="dashboard":
 
-        data=load_config()
-        s=data["settings"]
+# ---------------- DASHBOARD ----------------
 
-        text="📊 BOT DASHBOARD\n\n"
+async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = load_config()
+    s = data["settings"]
 
-        text+="📥 SOURCES\n"
+    text = "📊 BOT DASHBOARD\n\n"
 
-        if data["sources"]:
-            for x in data["sources"].values():
-                text+=f"• {x}\n"
-        else:
-            text+="None\n"
+    text += "📥 SOURCES\n"
+    if data["sources"]:
+        for x in data["sources"].values():
+            text += f"• {x}\n"
+    else:
+        text += "None\n"
 
-        text+="\n🎯 TARGETS\n"
+    text += "\n🎯 TARGETS\n"
+    if data["targets"]:
+        for x in data["targets"].values():
+            text += f"• {x}\n"
+    else:
+        text += "None\n"
 
-        if data["targets"]:
-            for x in data["targets"].values():
-                text+=f"• {x}\n"
-        else:
-            text+="None\n"
-
-        text+=f"""
+    text += f"""
 
 ⚙ SETTINGS
 
@@ -152,142 +111,155 @@ Blacklist Words : {len(s["blacklist"])}
 Replace Link : {s["replace_link"] or "None"}
 """
 
-        await query.message.reply_text(text)
+    if update.callback_query:
+        await update.callback_query.message.reply_text(text)
+    else:
+        await update.message.reply_text(text)
 
 
 # ---------------- FETCH CHATS ----------------
 
-async def fetch(update:Update,context:ContextTypes.DEFAULT_TYPE):
-
+async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global chat_list
 
-    query=update.callback_query
+    query = update.callback_query
     await query.answer()
 
-    dialogs=await client.get_dialogs()
+    dialogs = await client.get_dialogs()
+    chat_list = dialogs[:15]
 
-    chat_list=dialogs[:15]
+    txt = "📋 SELECT CHAT\n\n"
 
-    txt="📋 SELECT CHAT\n\n"
+    for i, c in enumerate(chat_list, 1):
+        txt += f"{i}. {c.name}\n"
 
-    for i,c in enumerate(chat_list,1):
-        txt+=f"{i}. {c.name}\n"
+    buttons = []
+    row = []
 
-    btn=[]
-    row=[]
+    for i in range(1, len(chat_list) + 1):
+        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
-    for i in range(1,len(chat_list)+1):
-
-        row.append(InlineKeyboardButton(str(i),callback_data=f"add_{i}"))
-
-        if len(row)==5:
-            btn.append(row)
-            row=[]
+        if len(row) == 5:
+            buttons.append(row)
+            row = []
 
     if row:
-        btn.append(row)
+        buttons.append(row)
 
-    await query.message.reply_text(
-
-        txt,
-
-        reply_markup=InlineKeyboardMarkup(btn)
-
-    )
+    await query.message.reply_text(txt, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 # ---------------- ADD CHAT ----------------
 
-async def add(update:Update,context:ContextTypes.DEFAULT_TYPE):
-
+async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global mode
 
-    query=update.callback_query
+    query = update.callback_query
     await query.answer()
 
-    index=int(query.data.split("_")[1])-1
+    index = int(query.data.split("_")[1]) - 1
+    chat = chat_list[index]
 
-    if index>=len(chat_list):
+    cid = str(chat.id)
+    name = chat.name
 
-        await query.message.reply_text("❌ Invalid selection")
-        return
+    data = load_config()
 
-    chat=chat_list[index]
-
-    cid=str(chat.id)
-    name=chat.name
-
-    data=load_config()
-
-    if mode=="source":
-
+    if mode == "source":
         if cid in data["sources"]:
-
-            await query.message.reply_text(
-                f"❌ Already added as SOURCE\n📥 {name}"
-            )
-
+            await query.message.reply_text(f"❌ Already SOURCE\n{name}")
             return
+        data["sources"][cid] = name
+        await query.message.reply_text(f"✅ SOURCE ADDED\n{name}")
 
-        data["sources"][cid]=name
-
-        await query.message.reply_text(
-            f"✅ SOURCE ADDED\n📥 {name}"
-        )
-
-
-    elif mode=="target":
-
+    elif mode == "target":
         if cid in data["targets"]:
-
-            await query.message.reply_text(
-                f"❌ Already added as TARGET\n🎯 {name}"
-            )
-
+            await query.message.reply_text(f"❌ Already TARGET\n{name}")
             return
-
-        data["targets"][cid]=name
-
-        await query.message.reply_text(
-            f"✅ TARGET ADDED\n🎯 {name}"
-        )
-
+        data["targets"][cid] = name
+        await query.message.reply_text(f"✅ TARGET ADDED\n{name}")
 
     save_config(data)
 
 
-# ---------------- USERBOT START ----------------
+# ---------------- COMMAND SETTINGS ----------------
+
+async def set_toggle(update, key, value):
+    data = load_config()
+    data["settings"][key] = value
+    save_config(data)
+    await update.message.reply_text(f"{key} set to {value}")
+
+
+async def forward_on(update, c): await set_toggle(update, "forward", True)
+async def forward_off(update, c): await set_toggle(update, "forward", False)
+
+async def media_on(update, c): await set_toggle(update, "media", True)
+async def media_off(update, c): await set_toggle(update, "media", False)
+
+async def links_on(update, c): await set_toggle(update, "remove_links", True)
+async def links_off(update, c): await set_toggle(update, "remove_links", False)
+
+async def username_on(update, c): await set_toggle(update, "remove_username", True)
+async def username_off(update, c): await set_toggle(update, "remove_username", False)
+
+async def autodelete_on(update, c): await set_toggle(update, "auto_delete", True)
+async def autodelete_off(update, c): await set_toggle(update, "auto_delete", False)
+
+
+async def blacklist_add(update, context):
+    data = load_config()
+    words = context.args
+    data["settings"]["blacklist"].extend(words)
+    save_config(data)
+    await update.message.reply_text("Blacklist updated")
+
+
+async def blacklist_remove(update, context):
+    data = load_config()
+    words = context.args
+    data["settings"]["blacklist"] = [
+        w for w in data["settings"]["blacklist"] if w not in words
+    ]
+    save_config(data)
+    await update.message.reply_text("Blacklist updated")
+
+
+# ---------------- START USERBOT ----------------
 
 async def startup(app):
-
     asyncio.create_task(start_userbot())
 
 
 # ---------------- MAIN ----------------
 
 def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(startup).build()
 
-    app=ApplicationBuilder().token(BOT_TOKEN).post_init(startup).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("dashboard", dashboard))
 
-    app.add_handler(CommandHandler("start",start))
+    app.add_handler(CommandHandler("forward_on", forward_on))
+    app.add_handler(CommandHandler("forward_off", forward_off))
+    app.add_handler(CommandHandler("media_on", media_on))
+    app.add_handler(CommandHandler("media_off", media_off))
+    app.add_handler(CommandHandler("links_on", links_on))
+    app.add_handler(CommandHandler("links_off", links_off))
+    app.add_handler(CommandHandler("username_on", username_on))
+    app.add_handler(CommandHandler("username_off", username_off))
+    app.add_handler(CommandHandler("autodelete_on", autodelete_on))
+    app.add_handler(CommandHandler("autodelete_off", autodelete_off))
 
-    app.add_handler(
-        CallbackQueryHandler(panel,pattern="^(sources|targets|dashboard)$")
-    )
+    app.add_handler(CommandHandler("blacklist_add", blacklist_add))
+    app.add_handler(CommandHandler("blacklist_remove", blacklist_remove))
 
-    app.add_handler(
-        CallbackQueryHandler(fetch,pattern="^fetch$")
-    )
-
-    app.add_handler(
-        CallbackQueryHandler(add,pattern=r"^add_\d+$")
-    )
+    app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|dashboard)$"))
+    app.add_handler(CallbackQueryHandler(fetch, pattern="^fetch$"))
+    app.add_handler(CallbackQueryHandler(add, pattern=r"^add_\d+$"))
 
     print("BOT STARTED")
-
     app.run_polling()
 
 
-if __name__=="__main__":
-
+if __name__ == "__main__":
     main()
