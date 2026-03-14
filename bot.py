@@ -216,122 +216,81 @@ async def add_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_config(data)
 
 
-# ---------------- COMMANDS ----------------
+# ---------------- SETTINGS COMMANDS ----------------
 
 async def forward_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["forward"] = True
-
     save_config(data)
-
     await update.message.reply_text("✅ Forwarding ON")
 
 
 async def forward_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["forward"] = False
-
     save_config(data)
-
     await update.message.reply_text("❌ Forwarding OFF")
 
 
 async def media_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["media"] = True
-
     save_config(data)
-
     await update.message.reply_text("📸 Media Forwarding ON")
 
 
 async def media_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["media"] = False
-
     save_config(data)
-
     await update.message.reply_text("📸 Media Forwarding OFF")
 
 
 async def links_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["remove_links"] = True
-
     save_config(data)
-
     await update.message.reply_text("🔗 Links Removal ON")
 
 
 async def links_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["remove_links"] = False
-
     save_config(data)
-
     await update.message.reply_text("🔗 Links Removal OFF")
 
 
 async def username_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["remove_username"] = True
-
     save_config(data)
-
     await update.message.reply_text("👤 Username Removal ON")
 
 
 async def username_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["remove_username"] = False
-
     save_config(data)
-
     await update.message.reply_text("👤 Username Removal OFF")
 
 
 async def autodelete_on(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["auto_delete"] = True
-
     save_config(data)
-
     await update.message.reply_text("🗑 Auto Delete ON")
 
 
 async def autodelete_off(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     data = load_config()
-
     data["settings"]["auto_delete"] = False
-
     save_config(data)
-
     await update.message.reply_text("🗑 Auto Delete OFF")
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = load_config()
-
     s = data["settings"]
 
     text = f"""
@@ -348,7 +307,7 @@ Blacklist: {s["blacklist"]}
     await update.message.reply_text(text)
 
 
-# ---------------- USERBOT ----------------
+# ---------------- USERBOT START ----------------
 
 async def on_startup(app):
 
@@ -380,11 +339,11 @@ def main():
 
     app.add_handler(CommandHandler("settings", settings))
 
-    app.add_handler(CallbackQueryHandler(panel, pattern="sources|targets|dashboard"))
+    app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|dashboard)$"))
 
-    app.add_handler(CallbackQueryHandler(fetch_chats, pattern="fetch_chats"))
+    app.add_handler(CallbackQueryHandler(fetch_chats, pattern="^fetch_chats$"))
 
-    app.add_handler(CallbackQueryHandler(add_chat, pattern=r"^addchat_"))
+    app.add_handler(CallbackQueryHandler(add_chat, pattern=r"^addchat_\d+$"))
 
     print("BOT STARTED")
 
