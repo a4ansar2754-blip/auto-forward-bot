@@ -1,13 +1,6 @@
 import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (
-ApplicationBuilder,
-CommandHandler,
-CallbackQueryHandler,
-MessageHandler,
-filters,
-ContextTypes
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 from userbot_manager import login_user, clients
 from config_manager import get_config, save_config
@@ -15,8 +8,8 @@ from config_manager import get_config, save_config
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 login_state = {}
-mode = {}
 chat_cache = {}
+mode = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -24,6 +17,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🔑 Login", callback_data="login")],
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
+        [InlineKeyboardButton("🗑 Remove Sources", callback_data="remove_sources")],
+        [InlineKeyboardButton("❌ Remove Targets", callback_data="remove_targets")],
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")]
     ]
 
@@ -43,27 +38,14 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         login_state[user] = "PHONE"
 
-        await q.message.reply_text(
-            "📱 Send phone number\nExample: +919999999999"
-        )
+        await q.message.reply_text("Send phone number\nExample:\n+919876543210")
 
-    elif q.data == "sources":
+    elif q.data in ["sources","targets"]:
 
-        mode[user] = "source"
+        mode[user] = q.data
 
         await q.message.reply_text(
-            "📥 Choose source",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Show Chats", callback_data="fetch")]]
-            )
-        )
-
-    elif q.data == "targets":
-
-        mode[user] = "target"
-
-        await q.message.reply_text(
-            "🎯 Choose target",
+            "📋 Show chats",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton("Show Chats", callback_data="fetch")]]
             )
@@ -73,14 +55,14 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         data = get_config(user)
 
-        text = f"""
+        txt = f"""
 📊 Dashboard
 
 Sources: {len(data["sources"])}
 Targets: {len(data["targets"])}
 """
 
-        await q.message.reply_text(text)
+        await q.message.reply_text(txt)
 
 async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -90,6 +72,7 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text = update.message.text
+
     state = login_state[user]
 
     if state == "PHONE":
@@ -99,6 +82,7 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         r = await login_user(user, text)
 
         if r == "CODE":
+
             await update.message.reply_text("Send OTP")
 
     else:
@@ -111,7 +95,7 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             login_state.pop(user)
 
-            await update.message.reply_text("✅ Login success")
+            await update.message.reply_text("✅ Login successful")
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -129,19 +113,28 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     dialogs = await client.get_dialogs()
 
-    chats = dialogs[:10]
+    chats = dialogs[:15]
 
     chat_cache[user] = chats
 
-    text = ""
+    text = "SELECT CHAT\n\n"
 
     for i,c in enumerate(chats,1):
         text += f"{i}. {c.name}\n"
 
-    buttons = [
-        [InlineKeyboardButton(str(i), callback_data=f"add_{i}")]
-        for i in range(1,len(chats)+1)
-    ]
+    buttons = []
+    row = []
+
+    for i in range(1,len(chats)+1):
+
+        row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
+
+        if len(row)==5:
+            buttons.append(row)
+            row=[]
+
+    if row:
+        buttons.append(row)
 
     await q.message.reply_text(
         text,
@@ -161,16 +154,14 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = get_config(user)
 
-    if mode[user] == "source":
+    if mode[user]=="sources":
 
         data["sources"][str(chat.id)] = chat.name
-
         await q.message.reply_text("Source added")
 
     else:
 
         data["targets"][str(chat.id)] = chat.name
-
         await q.message.reply_text("Target added")
 
     save_config(user,data)
@@ -179,15 +170,15 @@ def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("start",start))
     app.add_handler(CallbackQueryHandler(panel))
-    app.add_handler(CallbackQueryHandler(fetch, pattern="fetch"))
-    app.add_handler(CallbackQueryHandler(add, pattern="add_"))
-    app.add_handler(MessageHandler(filters.TEXT, login_flow))
+    app.add_handler(CallbackQueryHandler(fetch,pattern="fetch"))
+    app.add_handler(CallbackQueryHandler(add,pattern="add_"))
+    app.add_handler(MessageHandler(filters.TEXT,login_flow))
 
-    print("BOT RUNNING")
+    print("BOT STARTED")
 
     app.run_polling()
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
