@@ -10,25 +10,66 @@ from telegram.ext import (
 )
 
 from userbot_manager import login_user
-from engine import start_engine, stop_engine
+from engine import start_engine, stop_engine, running
+from chat_picker import get_user_chats, get_chat
+from config_manager import get_config, save_config
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 login_state = {}
 phone_data = {}
+mode_state = {}
+
+def main_panel():
+
+    keyboard = [
+
+        [InlineKeyboardButton("🔑 Login", callback_data="login")],
+
+        [InlineKeyboardButton("📥 Add Sources", callback_data="addsrc")],
+        [InlineKeyboardButton("🎯 Add Targets", callback_data="addtgt")],
+
+        [InlineKeyboardButton("📌 Show Chats", callback_data="showchats")],
+
+        [InlineKeyboardButton("🚀 Start Forward", callback_data="start")],
+        [InlineKeyboardButton("⛔ Stop Forward", callback_data="stop")],
+
+        [InlineKeyboardButton("📊 Dashboard", callback_data="dash")]
+    ]
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def chat_buttons():
+
+    rows = []
+    num = 1
+
+    for i in range(3):
+
+        row = []
+
+        for j in range(5):
+
+            row.append(
+                InlineKeyboardButton(
+                    str(num),
+                    callback_data=f"chat_{num}"
+                )
+            )
+
+            num += 1
+
+        rows.append(row)
+
+    return InlineKeyboardMarkup(rows)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    keyboard = [
-        [InlineKeyboardButton("Login", callback_data="login")],
-        [InlineKeyboardButton("Start Forward", callback_data="start")],
-        [InlineKeyboardButton("Stop Forward", callback_data="stop")]
-    ]
-
     await update.message.reply_text(
-        "AUTO FORWARD PANEL",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "🚀 AUTO FORWARD PANEL",
+        reply_markup=main_panel()
     )
 
 
@@ -73,27 +114,105 @@ async def login_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             login_state.pop(user)
 
-            await update.message.reply_text("Login Success")
+            await update.message.reply_text("✅ Login Success")
 
 
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    q = update.callback_query
-    await q.answer()
+    query = update.callback_query
+    await query.answer()
 
-    user = q.from_user.id
+    user = query.from_user.id
+    data = query.data
 
-    if q.data == "start":
+    if data == "login":
+
+        login_state[user] = "PHONE"
+
+        await query.message.reply_text(
+            "Send phone number\nExample:\n+919876543210"
+        )
+
+    elif data == "addsrc":
+
+        mode_state[user] = "SOURCE"
+
+        await query.message.reply_text(
+            "Select source from chats"
+        )
+
+    elif data == "addtgt":
+
+        mode_state[user] = "TARGET"
+
+        await query.message.reply_text(
+            "Select target from chats"
+        )
+
+    elif data == "showchats":
+
+        chats = await get_user_chats(user)
+
+        text = "📋 SELECT CHAT\n\n"
+
+        for i, chat in enumerate(chats, start=1):
+            text += f"{i}. {chat.name}\n"
+
+        await query.message.reply_text(
+            text,
+            reply_markup=chat_buttons()
+        )
+
+    elif data.startswith("chat_"):
+
+        index = int(data.split("_")[1]) - 1
+
+        chat_id = get_chat(user, index)
+
+        config = get_config(user)
+
+        if mode_state.get(user) == "SOURCE":
+
+            if chat_id not in config["sources"]:
+                config["sources"].append(chat_id)
+                await query.message.reply_text("✅ SOURCE ADDED")
+
+        elif mode_state.get(user) == "TARGET":
+
+            if chat_id not in config["targets"]:
+                config["targets"].append(chat_id)
+                await query.message.reply_text("✅ TARGET ADDED")
+
+        save_config(user, config)
+
+    elif data == "start":
 
         await start_engine(user)
 
-        await q.message.reply_text("Forward Started")
+        await query.message.reply_text("🚀 Forward Started")
 
-    elif q.data == "stop":
+    elif data == "stop":
 
         await stop_engine(user)
 
-        await q.message.reply_text("Forward Stopped")
+        await query.message.reply_text("⛔ Forward Stopped")
+
+    elif data == "dash":
+
+        config = get_config(user)
+
+        status = "🟢 RUNNING" if user in running else "🔴 STOPPED"
+
+        text = f"""
+📊 DASHBOARD
+
+Sources : {len(config['sources'])}
+Targets : {len(config['targets'])}
+
+Status : {status}
+"""
+
+        await query.message.reply_text(text)
 
 
 def main():
@@ -108,6 +227,8 @@ def main():
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, login_flow)
     )
+
+    print("BOT STARTED")
 
     app.run_polling()
 
