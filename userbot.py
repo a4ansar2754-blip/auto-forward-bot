@@ -10,13 +10,19 @@ CONFIG_FILE = "config.json"
 
 client = TelegramClient("userbot", API_ID, API_HASH)
 
-message_map = {}
+# message mapping for reply/edit/delete sync
+msg_map = {}
 
 
 def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {"sources": {}, "targets": {}, "settings": {}}
+
     with open(CONFIG_FILE) as f:
         return json.load(f)
 
+
+# ---------------- START USERBOT ----------------
 
 async def start_userbot():
 
@@ -24,13 +30,15 @@ async def start_userbot():
 
     print("USERBOT STARTED")
 
+    # ---------------- NORMAL MESSAGE ----------------
+
     @client.on(events.NewMessage)
-    async def handler(event):
+    async def forward_handler(event):
 
         data = load_config()
 
-        sources = data["sources"]
-        targets = data["targets"]
+        sources = data.get("sources", {})
+        targets = data.get("targets", {})
 
         chat_id = str(event.chat_id)
 
@@ -39,34 +47,94 @@ async def start_userbot():
 
         for target_id in targets.keys():
 
-            if event.message.media:
+            try:
+
+                reply_to = None
+
+                if event.message.is_reply:
+                    reply_id = event.message.reply_to_msg_id
+                    reply_to = msg_map.get(reply_id, {}).get(target_id)
+
+                if event.message.media:
+
+                    sent = await client.send_file(
+                        int(target_id),
+                        event.message.media,
+                        caption=event.message.text,
+                        reply_to=reply_to
+                    )
+
+                else:
+
+                    sent = await client.send_message(
+                        int(target_id),
+                        event.message.text,
+                        reply_to=reply_to,
+                        link_preview=False
+                    )
+
+                msg_map.setdefault(event.message.id, {})[target_id] = sent.id
+
+            except Exception as e:
+                print("Forward error:", e)
+
+
+    # ---------------- ALBUM FORWARD ----------------
+
+    @client.on(events.Album)
+    async def album_forward(event):
+
+        data = load_config()
+
+        sources = data.get("sources", {})
+        targets = data.get("targets", {})
+
+        chat_id = str(event.chat_id)
+
+        if chat_id not in sources:
+            return
+
+        media_files = []
+        caption = ""
+
+        for msg in event.messages:
+
+            if msg.media:
+                media_files.append(msg.media)
+
+            if msg.text and caption == "":
+                caption = msg.text
+
+        for target_id in targets.keys():
+
+            try:
 
                 sent = await client.send_file(
                     int(target_id),
-                    event.message.media,
-                    caption=event.message.text
+                    media_files,
+                    caption=caption
                 )
 
-            else:
+                for i, msg in enumerate(event.messages):
+                    msg_map.setdefault(msg.id, {})[target_id] = sent[i].id
 
-                sent = await client.send_message(
-                    int(target_id),
-                    event.message.text
-                )
-
-            message_map.setdefault(event.message.id, {})[target_id] = sent.id
+            except Exception as e:
+                print("Album error:", e)
 
 
     # ---------------- DELETE SYNC ----------------
 
     @client.on(events.MessageDeleted)
-    async def delete_handler(event):
+    async def delete_sync(event):
+
+        data = load_config()
+        targets = data.get("targets", {})
 
         for msg_id in event.deleted_ids:
 
-            if msg_id in message_map:
+            if msg_id in msg_map:
 
-                for target_id, target_msg in message_map[msg_id].items():
+                for target_id, target_msg in msg_map[msg_id].items():
 
                     try:
                         await client.delete_messages(int(target_id), target_msg)
@@ -77,24 +145,25 @@ async def start_userbot():
     # ---------------- EDIT SYNC ----------------
 
     @client.on(events.MessageEdited)
-    async def edit_handler(event):
+    async def edit_sync(event):
 
         msg_id = event.message.id
 
-        if msg_id in message_map:
+        if msg_id not in msg_map:
+            return
 
-            for target_id, target_msg in message_map[msg_id].items():
+        for target_id, target_msg in msg_map[msg_id].items():
 
-                try:
+            try:
 
-                    await client.edit_message(
-                        int(target_id),
-                        target_msg,
-                        event.message.text
-                    )
+                await client.edit_message(
+                    int(target_id),
+                    target_msg,
+                    event.message.text
+                )
 
-                except:
-                    pass
+            except:
+                pass
 
 
     await client.run_until_disconnected()
