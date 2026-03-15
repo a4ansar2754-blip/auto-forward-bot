@@ -5,6 +5,7 @@ import asyncio
 
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from telethon.errors import FloodWaitError
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -32,33 +33,26 @@ def process_text(text, s):
     if not text:
         return ""
 
-    # blacklist words
     for w in s.get("blacklist", []):
         if w.lower() in text.lower():
             return None
 
-    # remove username
     if s.get("remove_username"):
         text = re.sub(r"@\w+", "", text)
 
-    # replace words
     replace_words = s.get("replace_words", {})
     for old, new in replace_words.items():
         text = text.replace(old, new)
 
-    # replace links
     if s.get("replace_link"):
         text = re.sub(r"https?://\S+", s["replace_link"], text)
 
-    # remove links
     elif s.get("remove_links"):
         text = re.sub(r"https?://\S+", "", text)
 
-    # header
     if s.get("header"):
         text = s["header"] + "\n\n" + text
 
-    # footer
     if s.get("footer"):
         text = text + "\n\n" + s["footer"]
 
@@ -83,6 +77,47 @@ async def auto_delete(chat_id, msg_id):
         await client.delete_messages(int(chat_id), msg_id)
     except:
         pass
+
+
+# =========================
+# SAFE SEND SYSTEM
+# =========================
+
+async def safe_send(target, text=None, file=None, reply=None):
+
+    try:
+
+        if file:
+            return await client.send_file(
+                int(target),
+                file,
+                caption=text,
+                reply_to=reply
+            )
+
+        else:
+
+            if not text:
+                return None
+
+            return await client.send_message(
+                int(target),
+                text,
+                reply_to=reply,
+                link_preview=False
+            )
+
+    except FloodWaitError as fw:
+
+        print("Flood wait:", fw.seconds)
+        await asyncio.sleep(fw.seconds)
+
+        return await safe_send(target, text, file, reply)
+
+    except Exception as er:
+
+        print("SEND ERROR:", er)
+        return None
 
 
 # =========================
@@ -117,16 +152,17 @@ async def forward_handler(e):
 
             reply_id = None
 
-            # reply sync
             if e.is_reply:
 
                 r = await e.get_reply_message()
 
                 if r and r.id in msg_map:
-
                     reply_id = msg_map[r.id].get(t)
 
-            # album forward
+            # =========================
+            # ALBUM HANDLER
+            # =========================
+
             if e.grouped_id:
 
                 album_cache.setdefault(e.grouped_id, []).append(e)
@@ -135,33 +171,63 @@ async def forward_handler(e):
 
                 msgs = album_cache.pop(e.grouped_id, [])
 
-                files = [m.media for m in msgs]
+                files = [m.media for m in msgs if m.media]
 
-                sent = await client.send_file(
-                    int(t),
+                if not files:
+                    continue
+
+                sent = await safe_send(
+                    t,
+                    text,
                     files,
-                    caption=text,
-                    reply_to=reply_id
+                    reply_id
                 )
 
-            # media forward
+            # =========================
+            # MEDIA MESSAGE
+            # =========================
+
             elif e.media and s.get("media"):
 
-                sent = await client.send_file(
-                    int(t),
-                    e.media,
-                    caption=text,
-                    reply_to=reply_id
-                )
+                try:
+
+                    sent = await safe_send(
+                        t,
+                        text,
+                        e.media,
+                        reply_id
+                    )
+
+                except:
+
+                    # fallback download
+                    file = await e.download_media()
+
+                    sent = await safe_send(
+                        t,
+                        text,
+                        file,
+                        reply_id
+                    )
+
+            # =========================
+            # TEXT MESSAGE
+            # =========================
 
             else:
 
-                sent = await client.send_message(
-                    int(t),
+                if not text:
+                    continue
+
+                sent = await safe_send(
+                    t,
                     text,
-                    reply_to=reply_id,
-                    link_preview=False
+                    None,
+                    reply_id
                 )
+
+            if not sent:
+                continue
 
             msg_map.setdefault(e.id, {})[t] = sent.id
 
@@ -169,7 +235,7 @@ async def forward_handler(e):
                 asyncio.create_task(auto_delete(t, sent.id))
 
         except Exception as er:
-            print(er)
+            print("FORWARD ERROR:", er)
 
 
 # =========================
@@ -193,7 +259,7 @@ async def edit_handler(e):
 
             mid = msg_map[e.id].get(t)
 
-            if mid:
+            if mid and text:
                 await client.edit_message(int(t), mid, text)
 
         except:
