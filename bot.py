@@ -36,11 +36,15 @@ def icon(v):
 # ---------------- START PANEL ----------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     keyboard = [
         [InlineKeyboardButton("📥 Add Sources", callback_data="sources")],
         [InlineKeyboardButton("🎯 Add Targets", callback_data="targets")],
+        [InlineKeyboardButton("❌ Remove Sources", callback_data="remove_sources")],
+        [InlineKeyboardButton("❌ Remove Targets", callback_data="remove_targets")],
         [InlineKeyboardButton("📊 Dashboard", callback_data="dashboard")],
     ]
+
     await update.message.reply_text(
         "🚀 AUTO FORWARD PANEL",
         reply_markup=InlineKeyboardMarkup(keyboard),
@@ -50,6 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- PANEL ----------------
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     global mode
 
     query = update.callback_query
@@ -71,6 +76,12 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(kb),
         )
 
+    elif query.data == "remove_sources":
+        await remove_sources_ui(update)
+
+    elif query.data == "remove_targets":
+        await remove_targets_ui(update)
+
     elif query.data == "dashboard":
         await dashboard(update, context)
 
@@ -78,6 +89,7 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- DASHBOARD ----------------
 
 async def dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     data = load_config()
     s = data["settings"]
 
@@ -120,6 +132,7 @@ Replace Link : {s.get("replace_link") or "None"}
 # ---------------- FETCH CHATS ----------------
 
 async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     global chat_list
 
     query = update.callback_query
@@ -137,6 +150,7 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = []
 
     for i in range(1, len(chat_list) + 1):
+
         row.append(InlineKeyboardButton(str(i), callback_data=f"add_{i}"))
 
         if len(row) == 5:
@@ -152,6 +166,7 @@ async def fetch(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- ADD CHAT ----------------
 
 async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     global mode
 
     query = update.callback_query
@@ -166,28 +181,148 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = load_config()
 
     if mode == "source":
+
         if cid in data["sources"]:
             await query.message.reply_text(f"❌ Already SOURCE\n{name}")
             return
+
         data["sources"][cid] = name
         await query.message.reply_text(f"✅ SOURCE ADDED\n{name}")
 
     elif mode == "target":
+
         if cid in data["targets"]:
             await query.message.reply_text(f"❌ Already TARGET\n{name}")
             return
+
         data["targets"][cid] = name
         await query.message.reply_text(f"✅ TARGET ADDED\n{name}")
 
     save_config(data)
 
 
-# ---------------- COMMAND SETTINGS ----------------
+# ---------------- REMOVE UI ----------------
+
+async def remove_sources_ui(update):
+
+    query = update.callback_query
+    data = load_config()
+
+    sources = list(data["sources"].items())
+
+    if not sources:
+        await query.message.reply_text("No sources added")
+        return
+
+    text = "❌ SELECT SOURCE TO REMOVE\n\n"
+
+    buttons = []
+    row = []
+
+    for i, (cid, name) in enumerate(sources, 1):
+
+        text += f"{i}. {name}\n"
+
+        row.append(InlineKeyboardButton(str(i), callback_data=f"rs_{cid}"))
+
+        if len(row) == 5:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
+
+    buttons.append([InlineKeyboardButton("❌ Remove ALL", callback_data="rs_all")])
+
+    await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def remove_targets_ui(update):
+
+    query = update.callback_query
+    data = load_config()
+
+    targets = list(data["targets"].items())
+
+    if not targets:
+        await query.message.reply_text("No targets added")
+        return
+
+    text = "❌ SELECT TARGET TO REMOVE\n\n"
+
+    buttons = []
+    row = []
+
+    for i, (cid, name) in enumerate(targets, 1):
+
+        text += f"{i}. {name}\n"
+
+        row.append(InlineKeyboardButton(str(i), callback_data=f"rt_{cid}"))
+
+        if len(row) == 5:
+            buttons.append(row)
+            row = []
+
+    if row:
+        buttons.append(row)
+
+    buttons.append([InlineKeyboardButton("❌ Remove ALL", callback_data="rt_all")])
+
+    await query.message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+
+async def remove_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    data = load_config()
+
+    if query.data == "rs_all":
+        data["sources"] = {}
+        save_config(data)
+        await query.message.reply_text("All sources removed")
+        return
+
+    if query.data == "rt_all":
+        data["targets"] = {}
+        save_config(data)
+        await query.message.reply_text("All targets removed")
+        return
+
+    if query.data.startswith("rs_"):
+
+        cid = query.data.replace("rs_", "")
+
+        if cid in data["sources"]:
+
+            name = data["sources"][cid]
+            del data["sources"][cid]
+            save_config(data)
+
+            await query.message.reply_text(f"❌ SOURCE REMOVED\n{name}")
+
+    if query.data.startswith("rt_"):
+
+        cid = query.data.replace("rt_", "")
+
+        if cid in data["targets"]:
+
+            name = data["targets"][cid]
+            del data["targets"][cid]
+            save_config(data)
+
+            await query.message.reply_text(f"❌ TARGET REMOVED\n{name}")
+
+
+# ---------------- SETTINGS COMMANDS ----------------
 
 async def set_toggle(update, key, value):
+
     data = load_config()
     data["settings"][key] = value
     save_config(data)
+
     await update.message.reply_text(f"{key} set to {value}")
 
 
@@ -208,104 +343,77 @@ async def autodelete_off(update, c): await set_toggle(update, "auto_delete", Fal
 
 
 async def blacklist_add(update, context):
+
     data = load_config()
     words = context.args
+
     data["settings"]["blacklist"].extend(words)
+
     save_config(data)
+
     await update.message.reply_text("Blacklist updated")
 
 
 async def blacklist_remove(update, context):
+
     data = load_config()
     words = context.args
+
     data["settings"]["blacklist"] = [
         w for w in data["settings"]["blacklist"] if w not in words
     ]
+
     save_config(data)
+
     await update.message.reply_text("Blacklist updated")
 
 
-# ---------------- REMOVE SOURCE ----------------
+# ---------------- REMOVE COMMAND ----------------
 
 async def remove_source(update, context):
-    if not context.args:
-        await update.message.reply_text("Usage: /remove_source channel_id")
-        return
-
-    source_id = context.args[0]
 
     data = load_config()
 
-    if source_id in data["sources"]:
-        name = data["sources"][source_id]
-        del data["sources"][source_id]
+    cid = context.args[0]
+
+    if cid in data["sources"]:
+
+        del data["sources"][cid]
         save_config(data)
 
-        await update.message.reply_text(f"❌ SOURCE REMOVED\n{name}")
-    else:
-        await update.message.reply_text("Source not found")
+        await update.message.reply_text("Source removed")
 
-
-# ---------------- REMOVE TARGET ----------------
 
 async def remove_target(update, context):
-    if not context.args:
-        await update.message.reply_text("Usage: /remove_target channel_id")
-        return
-
-    target_id = context.args[0]
 
     data = load_config()
 
-    if target_id in data["targets"]:
-        name = data["targets"][target_id]
-        del data["targets"][target_id]
+    cid = context.args[0]
+
+    if cid in data["targets"]:
+
+        del data["targets"][cid]
         save_config(data)
 
-        await update.message.reply_text(f"❌ TARGET REMOVED\n{name}")
-    else:
-        await update.message.reply_text("Target not found")
+        await update.message.reply_text("Target removed")
 
-
-# ---------------- COMMAND LIST ----------------
 
 async def commands(update, context):
 
-    text = """
-🤖 BOT COMMANDS
-
-/remove_source - remove source channel
-/remove_target - remove target channel
-
-/dashboard - show bot dashboard
-
-/forward_on
-/forward_off
-
-/media_on
-/media_off
-
-/links_on
-/links_off
-
-/username_on
-/username_off
-
-/autodelete_on
-/autodelete_off
-"""
-    await update.message.reply_text(text)
+    await update.message.reply_text("Commands working")
 
 
 # ---------------- START USERBOT ----------------
 
 async def startup(app):
+
     asyncio.create_task(start_userbot())
 
 
 # ---------------- MAIN ----------------
 
 def main():
+
     app = ApplicationBuilder().token(BOT_TOKEN).post_init(startup).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -329,11 +437,13 @@ def main():
     app.add_handler(CommandHandler("remove_target", remove_target))
     app.add_handler(CommandHandler("commands", commands))
 
-    app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|dashboard)$"))
+    app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|remove_sources|remove_targets|dashboard)$"))
     app.add_handler(CallbackQueryHandler(fetch, pattern="^fetch$"))
     app.add_handler(CallbackQueryHandler(add, pattern=r"^add_\d+$"))
+    app.add_handler(CallbackQueryHandler(remove_handler, pattern="^(rs_|rt_|rs_all|rt_all)"))
 
     print("BOT STARTED")
+
     app.run_polling()
 
 
