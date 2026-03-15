@@ -225,6 +225,82 @@ async def blacklist_remove(update, context):
     await update.message.reply_text("Blacklist updated")
 
 
+# REMOVE SOURCE
+async def remove_source(update, context):
+    if not context.args:
+        await update.message.reply_text("Usage: /remove_source channel_id")
+        return
+
+    source_id = context.args[0]
+
+    with open("config.json") as f:
+        config = json.load(f)
+
+    if source_id in config["sources"]:
+        del config["sources"][source_id]
+
+        with open("config.json", "w") as f:
+            json.dump(config, f, indent=4)
+
+        await update.message.reply_text(f"❌ Source Removed: {source_id}")
+    else:
+        await update.message.reply_text("Source not found")
+
+
+# REMOVE TARGET
+async def remove_target(update, context):
+    if not context.args:
+        await update.message.reply_text("Usage: /remove_target channel_id")
+        return
+
+    target_id = context.args[0]
+
+    with open("config.json") as f:
+        config = json.load(f)
+
+    if target_id in config["targets"]:
+        del config["targets"][target_id]
+
+        with open("config.json", "w") as f:
+            json.dump(config, f, indent=4)
+
+        await update.message.reply_text(f"❌ Target Removed: {target_id}")
+    else:
+        await update.message.reply_text("Target not found")
+
+
+# SHOW ALL COMMANDS
+async def commands(update, context):
+
+    text = """
+🤖 BOT COMMANDS
+
+/add_source - add source channel
+/remove_source - remove source channel
+
+/add_target - add target channel
+/remove_target - remove target channel
+
+/dashboard - show bot dashboard
+
+/forward_on - enable forwarding
+/forward_off - disable forwarding
+
+/media_on - enable media
+/media_off - disable media
+
+/links_on - remove links
+/links_off - keep links
+
+/username_on - remove usernames
+/username_off - keep usernames
+
+/autodelete_on
+/autodelete_off
+"""
+
+    await update.message.reply_text(text)
+
 # ---------------- START USERBOT ----------------
 
 async def startup(app):
@@ -252,6 +328,9 @@ def main():
 
     app.add_handler(CommandHandler("blacklist_add", blacklist_add))
     app.add_handler(CommandHandler("blacklist_remove", blacklist_remove))
+    app.add_handler(CommandHandler("remove_source", remove_source))
+    app.add_handler(CommandHandler("remove_target", remove_target))
+    app.add_handler(CommandHandler("commands", commands))
 
     app.add_handler(CallbackQueryHandler(panel, pattern="^(sources|targets|dashboard)$"))
     app.add_handler(CallbackQueryHandler(fetch, pattern="^fetch$"))
