@@ -108,7 +108,7 @@ Remove Username : {icon(s["remove_username"])}
 Auto Delete : {icon(s["auto_delete"])}
 
 Blacklist Words : {len(s["blacklist"])}
-Replace Link : {s["replace_link"] or "None"}
+Replace Link : {s.get("replace_link") or "None"}
 """
 
     if update.callback_query:
@@ -225,7 +225,8 @@ async def blacklist_remove(update, context):
     await update.message.reply_text("Blacklist updated")
 
 
-# REMOVE SOURCE
+# ---------------- REMOVE SOURCE ----------------
+
 async def remove_source(update, context):
     if not context.args:
         await update.message.reply_text("Usage: /remove_source channel_id")
@@ -233,21 +234,20 @@ async def remove_source(update, context):
 
     source_id = context.args[0]
 
-    with open("config.json") as f:
-        config = json.load(f)
+    data = load_config()
 
-    if source_id in config["sources"]:
-        del config["sources"][source_id]
+    if source_id in data["sources"]:
+        name = data["sources"][source_id]
+        del data["sources"][source_id]
+        save_config(data)
 
-        with open("config.json", "w") as f:
-            json.dump(config, f, indent=4)
-
-        await update.message.reply_text(f"❌ Source Removed: {source_id}")
+        await update.message.reply_text(f"❌ SOURCE REMOVED\n{name}")
     else:
         await update.message.reply_text("Source not found")
 
 
-# REMOVE TARGET
+# ---------------- REMOVE TARGET ----------------
+
 async def remove_target(update, context):
     if not context.args:
         await update.message.reply_text("Usage: /remove_target channel_id")
@@ -255,51 +255,47 @@ async def remove_target(update, context):
 
     target_id = context.args[0]
 
-    with open("config.json") as f:
-        config = json.load(f)
+    data = load_config()
 
-    if target_id in config["targets"]:
-        del config["targets"][target_id]
+    if target_id in data["targets"]:
+        name = data["targets"][target_id]
+        del data["targets"][target_id]
+        save_config(data)
 
-        with open("config.json", "w") as f:
-            json.dump(config, f, indent=4)
-
-        await update.message.reply_text(f"❌ Target Removed: {target_id}")
+        await update.message.reply_text(f"❌ TARGET REMOVED\n{name}")
     else:
         await update.message.reply_text("Target not found")
 
 
-# SHOW ALL COMMANDS
+# ---------------- COMMAND LIST ----------------
+
 async def commands(update, context):
 
     text = """
 🤖 BOT COMMANDS
 
-/add_source - add source channel
 /remove_source - remove source channel
-
-/add_target - add target channel
 /remove_target - remove target channel
 
 /dashboard - show bot dashboard
 
-/forward_on - enable forwarding
-/forward_off - disable forwarding
+/forward_on
+/forward_off
 
-/media_on - enable media
-/media_off - disable media
+/media_on
+/media_off
 
-/links_on - remove links
-/links_off - keep links
+/links_on
+/links_off
 
-/username_on - remove usernames
-/username_off - keep usernames
+/username_on
+/username_off
 
 /autodelete_on
 /autodelete_off
 """
-
     await update.message.reply_text(text)
+
 
 # ---------------- START USERBOT ----------------
 
@@ -328,6 +324,7 @@ def main():
 
     app.add_handler(CommandHandler("blacklist_add", blacklist_add))
     app.add_handler(CommandHandler("blacklist_remove", blacklist_remove))
+
     app.add_handler(CommandHandler("remove_source", remove_source))
     app.add_handler(CommandHandler("remove_target", remove_target))
     app.add_handler(CommandHandler("commands", commands))
