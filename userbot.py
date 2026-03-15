@@ -80,7 +80,7 @@ async def auto_delete(chat_id, msg_id):
 
 
 # =========================
-# SAFE SEND SYSTEM
+# SAFE SEND
 # =========================
 
 async def safe_send(target, text=None, file=None, reply=None):
@@ -88,6 +88,7 @@ async def safe_send(target, text=None, file=None, reply=None):
     try:
 
         if file:
+
             return await client.send_file(
                 int(target),
                 file,
@@ -121,7 +122,7 @@ async def safe_send(target, text=None, file=None, reply=None):
 
 
 # =========================
-# NEW MESSAGE FORWARD
+# FORWARD HANDLER
 # =========================
 
 @client.on(events.NewMessage)
@@ -160,7 +161,7 @@ async def forward_handler(e):
                     reply_id = msg_map[r.id].get(t)
 
             # =========================
-            # ALBUM HANDLER
+            # ALBUM SYSTEM
             # =========================
 
             if e.grouped_id:
@@ -171,7 +172,12 @@ async def forward_handler(e):
 
                 msgs = album_cache.pop(e.grouped_id, [])
 
-                files = [m.media for m in msgs if m.media]
+                files = []
+
+                for m in msgs:
+                    if m.media:
+                        file = await m.download_media()
+                        files.append(file)
 
                 if not files:
                     continue
@@ -189,26 +195,14 @@ async def forward_handler(e):
 
             elif e.media and s.get("media"):
 
-                try:
+                file = await e.download_media()
 
-                    sent = await safe_send(
-                        t,
-                        text,
-                        e.media,
-                        reply_id
-                    )
-
-                except:
-
-                    # fallback download
-                    file = await e.download_media()
-
-                    sent = await safe_send(
-                        t,
-                        text,
-                        file,
-                        reply_id
-                    )
+                sent = await safe_send(
+                    t,
+                    text,
+                    file,
+                    reply_id
+                )
 
             # =========================
             # TEXT MESSAGE
