@@ -25,13 +25,13 @@ def load():
 
 
 # =========================
-# TEXT PROCESS SYSTEM
+# TEXT PROCESS
 # =========================
 
 def process_text(text, s):
 
     if not text:
-        return ""
+        text = ""
 
     for w in s.get("blacklist", []):
         if w.lower() in text.lower():
@@ -40,89 +40,55 @@ def process_text(text, s):
     if s.get("remove_username"):
         text = re.sub(r"@\w+", "", text)
 
-    replace_words = s.get("replace_words", {})
-    for old, new in replace_words.items():
-        text = text.replace(old, new)
-
     if s.get("replace_link"):
         text = re.sub(r"https?://\S+", s["replace_link"], text)
 
     elif s.get("remove_links"):
         text = re.sub(r"https?://\S+", "", text)
 
-    if s.get("header"):
-        text = s["header"] + "\n\n" + text
-
-    if s.get("footer"):
-        text = text + "\n\n" + s["footer"]
-
     return text
 
 
 # =========================
-# AUTO DELETE
-# =========================
-
-async def auto_delete(chat_id, msg_id):
-
-    data = load()
-    delay = data["settings"].get("delete_timer", 0)
-
-    if delay <= 0:
-        return
-
-    await asyncio.sleep(delay)
-
-    try:
-        await client.delete_messages(int(chat_id), msg_id)
-    except:
-        pass
-
-
-# =========================
-# SAFE SEND
+# SAFE SEND SYSTEM
 # =========================
 
 async def safe_send(target, text=None, file=None, reply=None):
 
-    try:
+    while True:
 
-        if file:
+        try:
 
-            return await client.send_file(
-                int(target),
-                file,
-                caption=text,
-                reply_to=reply
-            )
+            if file:
+                sent = await client.send_file(
+                    int(target),
+                    file,
+                    caption=text,
+                    reply_to=reply
+                )
+            else:
+                sent = await client.send_message(
+                    int(target),
+                    text,
+                    reply_to=reply,
+                    link_preview=False
+                )
 
-        else:
+            return sent
 
-            if not text:
-                return None
+        except FloodWaitError as e:
 
-            return await client.send_message(
-                int(target),
-                text,
-                reply_to=reply,
-                link_preview=False
-            )
+            print("Flood wait", e.seconds)
+            await asyncio.sleep(e.seconds)
 
-    except FloodWaitError as fw:
+        except Exception as er:
 
-        print("Flood wait:", fw.seconds)
-        await asyncio.sleep(fw.seconds)
-
-        return await safe_send(target, text, file, reply)
-
-    except Exception as er:
-
-        print("SEND ERROR:", er)
-        return None
+            print("SEND ERROR:", er)
+            return None
 
 
 # =========================
-# FORWARD HANDLER
+# NEW MESSAGE
 # =========================
 
 @client.on(events.NewMessage)
@@ -142,7 +108,7 @@ async def forward_handler(e):
     if cid not in sources:
         return
 
-    text = process_text(e.message.text or "", s)
+    text = process_text(e.text, s)
 
     if text is None:
         return
@@ -160,9 +126,7 @@ async def forward_handler(e):
                 if r and r.id in msg_map:
                     reply_id = msg_map[r.id].get(t)
 
-            # =========================
-            # ALBUM SYSTEM
-            # =========================
+            # ===== ALBUM SYSTEM =====
 
             if e.grouped_id:
 
@@ -175,12 +139,10 @@ async def forward_handler(e):
                 files = []
 
                 for m in msgs:
+
                     if m.media:
                         file = await m.download_media()
                         files.append(file)
-
-                if not files:
-                    continue
 
                 sent = await safe_send(
                     t,
@@ -189,9 +151,7 @@ async def forward_handler(e):
                     reply_id
                 )
 
-            # =========================
-            # MEDIA MESSAGE
-            # =========================
+            # ===== MEDIA SYSTEM =====
 
             elif e.media and s.get("media"):
 
@@ -204,14 +164,9 @@ async def forward_handler(e):
                     reply_id
                 )
 
-            # =========================
-            # TEXT MESSAGE
-            # =========================
+            # ===== TEXT SYSTEM =====
 
             else:
-
-                if not text:
-                    continue
 
                 sent = await safe_send(
                     t,
@@ -221,14 +176,20 @@ async def forward_handler(e):
                 )
 
             if not sent:
-                continue
+                return
 
-            msg_map.setdefault(e.id, {})[t] = sent.id
+            # ===== FIX LIST BUG =====
 
-            if s.get("auto_delete"):
-                asyncio.create_task(auto_delete(t, sent.id))
+            if isinstance(sent, list):
+
+                msg_map.setdefault(e.id, {})[t] = sent[0].id
+
+            else:
+
+                msg_map.setdefault(e.id, {})[t] = sent.id
 
         except Exception as er:
+
             print("FORWARD ERROR:", er)
 
 
@@ -253,7 +214,7 @@ async def edit_handler(e):
 
             mid = msg_map[e.id].get(t)
 
-            if mid and text:
+            if mid:
                 await client.edit_message(int(t), mid, text)
 
         except:
