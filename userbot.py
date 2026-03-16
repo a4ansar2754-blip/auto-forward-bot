@@ -33,20 +33,24 @@ def process_text(text, s):
     if not text:
         text = ""
 
+    # blacklist
     for w in s.get("blacklist", []):
         if w.lower() in text.lower():
             return None
 
+    # remove username
     if s.get("remove_username"):
         text = re.sub(r"@\w+", "", text)
 
+    # replace links
     if s.get("replace_link"):
         text = re.sub(r"https?://\S+", s["replace_link"], text)
 
+    # remove links
     elif s.get("remove_links"):
         text = re.sub(r"https?://\S+", "", text)
 
-    return text
+    return text.strip()
 
 
 # =========================
@@ -54,6 +58,9 @@ def process_text(text, s):
 # =========================
 
 async def safe_send(target, text=None, file=None, reply=None):
+
+    if not text and not file:
+        return None
 
     while True:
 
@@ -63,7 +70,7 @@ async def safe_send(target, text=None, file=None, reply=None):
                 sent = await client.send_file(
                     int(target),
                     file,
-                    caption=text,
+                    caption=text if text else None,
                     reply_to=reply
                 )
             else:
@@ -78,7 +85,7 @@ async def safe_send(target, text=None, file=None, reply=None):
 
         except FloodWaitError as e:
 
-            print("Flood wait", e.seconds)
+            print("FloodWait:", e.seconds)
             await asyncio.sleep(e.seconds)
 
         except Exception as er:
@@ -88,7 +95,7 @@ async def safe_send(target, text=None, file=None, reply=None):
 
 
 # =========================
-# NEW MESSAGE
+# NEW MESSAGE HANDLER
 # =========================
 
 @client.on(events.NewMessage)
@@ -151,7 +158,7 @@ async def forward_handler(e):
                     reply_id
                 )
 
-            # ===== MEDIA SYSTEM =====
+            # ===== MEDIA =====
 
             elif e.media and s.get("media"):
 
@@ -164,7 +171,7 @@ async def forward_handler(e):
                     reply_id
                 )
 
-            # ===== TEXT SYSTEM =====
+            # ===== TEXT =====
 
             else:
 
@@ -176,7 +183,7 @@ async def forward_handler(e):
                 )
 
             if not sent:
-                return
+                continue
 
             # ===== FIX LIST BUG =====
 
