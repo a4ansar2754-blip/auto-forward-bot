@@ -68,7 +68,7 @@ async def safe_send(target, text=None, file=None, reply=None):
 @client.on(events.Album)
 async def album_handler(event):
 
-    await asyncio.sleep(10)  # 🔥 MAIN FIX (wait for full album)
+    await asyncio.sleep(10)
 
     data = load()
     cid = str(event.chat_id)
@@ -98,11 +98,7 @@ async def album_handler(event):
 
     for t in targets:
         try:
-            sent = await client.send_file(
-                int(t),
-                files,
-                caption=caption
-            )
+            sent = await client.send_file(int(t), files, caption=caption)
 
             for m in event.messages:
                 msg_map.setdefault(m.id, {})[t] = sent[0].id if isinstance(sent, list) else sent.id
@@ -111,7 +107,7 @@ async def album_handler(event):
             print("ALBUM ERROR:", er)
 
 
-# 🔥 NORMAL MESSAGE (MEDIA FIX)
+# 🔥 NORMAL MESSAGE (REPLY + MEDIA FIX)
 @client.on(events.NewMessage)
 async def forward_handler(e):
 
@@ -135,12 +131,23 @@ async def forward_handler(e):
     for t in targets:
         try:
 
+            # 🔥 REPLY SYNC
+            reply_to = None
+
+            if e.reply_to_msg_id:
+                old_reply = e.reply_to_msg_id
+
+                if old_reply in msg_map and t in msg_map[old_reply]:
+                    reply_to = msg_map[old_reply][t]
+
+            # 🔥 MEDIA + TEXT
             if e.media and data["settings"].get("media"):
                 file = await e.download_media()
-                sent = await safe_send(t, text, file)
+                sent = await safe_send(t, text, file, reply_to)
             else:
-                sent = await safe_send(t, text, None)
+                sent = await safe_send(t, text, None, reply_to)
 
+            # 🔥 SAVE MAP
             if sent:
                 msg_map.setdefault(e.id, {})[t] = sent.id
 
